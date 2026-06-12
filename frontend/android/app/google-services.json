@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "357186664125",
+    "project_id": "gojra-emart",
+    "storage_bucket": "gojra-emart.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:357186664125:android:e89618c8b93cbec997a9d4",
+        "android_client_info": {
+          "package_name": "com.example.frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDE66kIBCbryPrULkG0Pv41_5Xl-T2B2nI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
