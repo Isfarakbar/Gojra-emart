@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Product = require('../models/Product');
+const USER_PAGE_SIZE = 20;
 
 // @desc    Get user profile (including wishlist)
 // @route   GET /api/users/profile
@@ -92,10 +93,15 @@ const toggleWishlist = async (req, res) => {
 // @access  Private/Admin
 const getAllUsers = async (req, res) => {
     try {
+        const page = Math.max(Number(req.query.page) || 1, 1);
         const users = await User.find({})
             .select('-password -wishlist')
-            .sort({ createdAt: -1 });
-        res.json(users);
+            .sort({ createdAt: -1 })
+            .skip((page - 1) * USER_PAGE_SIZE)
+            .limit(USER_PAGE_SIZE);
+        const total = await User.countDocuments();
+
+        res.json({ users, page, limit: USER_PAGE_SIZE, total, pages: Math.ceil(total / USER_PAGE_SIZE) });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

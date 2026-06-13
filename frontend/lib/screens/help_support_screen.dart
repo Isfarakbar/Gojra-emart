@@ -62,7 +62,7 @@ class HelpSupportScreen extends StatelessWidget {
              const SizedBox(height: 16),
              
              _buildExpansionTile("How do I track my order?", "You can track your order status in the 'My Orders' section of the app."),
-             _buildExpansionTile("What payment methods do you accept?", "We accept Cash on Delivery (COD) and Credit/Debit cards via Stripe."),
+             _buildExpansionTile("What payment methods do you accept?", "We currently accept Cash on Delivery (COD) only."),
              _buildExpansionTile("How can I return an item?", "Please contact our support team within 24 hours of delivery for returns."),
              _buildExpansionTile("Do you deliver to my area?", "Currently, we only serve Gojra city and nearby areas."),
           ],

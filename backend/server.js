@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 require('./config/firebase'); // Initialize Firebase Admin SDK
 
 const app = express();
@@ -10,17 +12,17 @@ const app = express();
 const allowedOrigins = [
     'http://localhost:3000', // Next.js Admin
     'http://localhost:3001',
-    'http://10.0.2.2:5000',  // Android Emulator
-];
+    process.env.ADMIN_PANEL_URL,
+].filter(Boolean);
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (mobile apps, Postman, curl)
+        // Mobile apps generally send no browser Origin header.
         if (!origin) return callback(null, true);
         if (allowedOrigins.includes(origin)) {
             return callback(null, true);
         }
-        return callback(null, true); // Permissive for development
+        return callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -28,8 +30,15 @@ app.use(cors({
 }));
 
 // Middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(helmet());
+app.use(rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+}));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Request Logger
 app.use((req, res, next) => {

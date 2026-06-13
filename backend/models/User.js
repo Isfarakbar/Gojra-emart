@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
+    email: { type: String, required: false, unique: true, sparse: true },
     password: { type: String }, // Optional if using Google
     googleId: { type: String }, // Google User ID
     phone: { type: String, required: false }, // Optional for Google Users initially
@@ -12,11 +12,15 @@ const userSchema = new mongoose.Schema({
     wishlist: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
     resetPasswordOTP: { type: String },
     resetPasswordExpires: { type: Date },
+    resetPasswordAttempts: { type: Number, default: 0 },
     fcmToken: {
         type: String,
         default: null,
     },
 }, { timestamps: true });
+
+userSchema.index({ email: 1 });
+userSchema.index({ phone: 1 });
 
 // Hash password before saving
 // Hash password before saving

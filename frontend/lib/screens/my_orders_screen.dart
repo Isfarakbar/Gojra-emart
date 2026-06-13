@@ -26,7 +26,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     try {
       final response = await ApiService().dio.get('/orders/myorders');
       setState(() {
-        _orders = response.data;
+        _orders = response.data is Map ? response.data['orders'] ?? [] : response.data;
         _isLoading = false;
       });
     } catch (e) {
@@ -39,7 +39,8 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     switch (status) {
       case 'Placed': return Colors.amber; // Yellow
       case 'Confirmed': return Colors.blue; // Blue
-      case 'Out for delivery': return Colors.orange; // Orange
+      case 'Packing': return Colors.purple; // Purple
+      case 'Out for Delivery': return Colors.orange; // Orange
       case 'Delivered': return Colors.green; // Green
       case 'Cancelled': return Colors.red; // Red
       default: return Colors.grey;

@@ -4,8 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../providers/cart_provider.dart';
 import '../providers/auth_provider.dart';
 import 'package:flutter/services.dart';
-import '../services/api_service.dart';
-import '../utils/helpers.dart'; // Direct API call for mock payment intent if needed, or put inside provider
+import '../utils/helpers.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -17,11 +16,11 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
-  late TextEditingController _addressController;
+  late TextEditingController _streetController;
+  late TextEditingController _areaController;
   late TextEditingController _cityController;
   late TextEditingController _phoneController;
   
-  String _paymentMethod = 'COD'; // COD or Card
   bool _isLoading = false;
 
   @override
@@ -29,7 +28,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.initState();
     final user = Provider.of<AuthProvider>(context, listen: false).user;
     _nameController = TextEditingController(text: user?['name'] ?? '');
-    _addressController = TextEditingController(text: user?['address'] ?? '');
+    _streetController = TextEditingController(text: user?['address'] ?? '');
+    _areaController = TextEditingController();
     _cityController = TextEditingController(text: 'Gojra'); // Default
     _phoneController = TextEditingController(text: user?['phone'] ?? '');
   }
@@ -37,7 +37,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _addressController.dispose();
+    _streetController.dispose();
+    _areaController.dispose();
     _cityController.dispose();
     _phoneController.dispose();
     super.dispose();
@@ -50,11 +51,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final cart = Provider.of<CartProvider>(context, listen: false);
 
     try {
-      if (_paymentMethod == 'Card') {
-         await _processCardPayment(cart);
-      } else {
-         await _processCODPayment(cart);
-      }
+      await _processCODPayment(cart);
     } catch (e) {
        // Clean error message if it's an exception
        final msg = e.toString().contains("Exception:") ? e.toString().replaceAll("Exception: ", "") : e.toString();
@@ -66,49 +63,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _processCODPayment(CartProvider cart) async {
       final error = await cart.placeOrder(
-          _addressController.text,
+          _streetController.text,
+          _areaController.text,
           _cityController.text,
           _phoneController.text,
           paymentMethod: 'COD'
       );
       if (error == null) _showSuccess();
       else throw Exception(error);
-  }
-
-  Future<void> _processCardPayment(CartProvider cart) async {
-      // 1. Create Payment Intent (Mock)
-      final apiService = ApiService();
-      final response = await apiService.dio.post('/payments/create-payment-intent', data: {
-          'amount': cart.totalAmount,
-      });
-
-      if (response.statusCode == 200) {
-          final clientSecret = response.data['clientSecret'];
-          final id = response.data['id'];
-          
-          // 2. Simulate User entering card details and paying...
-          await Future.delayed(const Duration(seconds: 2)); // Fake processing
-
-          // 3. Confirm Order
-          final error = await cart.placeOrder(
-              _addressController.text,
-              _cityController.text,
-              _phoneController.text,
-              paymentMethod: 'Card',
-              paymentResult: {
-                  'id': id,
-                  'status': 'succeeded',
-                  'update_time': DateTime.now().toIso8601String(),
-                  'email_address': _nameController.text // placeholder
-              }
-          );
-          
-          if (error == null) _showSuccess();
-          else throw Exception(error);
-
-      } else {
-          throw Exception("Payment initialization failed");
-      }
   }
 
   void _showSuccess() {
@@ -139,14 +101,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                const SizedBox(height: 10),
                _buildTextField("Phone Number", _phoneController, Icons.phone, keyboardType: TextInputType.phone),
                const SizedBox(height: 10),
-               _buildTextField("Address", _addressController, Icons.home, maxLines: 2),
+               _buildTextField("Street Address", _streetController, Icons.home, maxLines: 2),
+               const SizedBox(height: 10),
+               _buildTextField("Area / Mohalla", _areaController, Icons.place),
                const SizedBox(height: 10),
                _buildTextField("City", _cityController, Icons.location_city),
                
-               const SizedBox(height: 24),
-               _buildSectionTitle("Payment Method"),
-               _buildPaymentOption("Cash on Delivery", 'COD', Icons.money),
-               _buildPaymentOption("Credit/Debit Card (Stripe)", 'Card', Icons.credit_card),
+                const SizedBox(height: 24),
+                _buildSectionTitle("Payment Method"),
+                _buildPaymentOption("Cash on Delivery", 'COD', Icons.money),
                
                const SizedBox(height: 24),
                _buildSectionTitle("Order Summary"),
@@ -174,7 +137,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                        ),
                        child: _isLoading 
                         ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : Text(_paymentMethod == 'COD' ? "Place Order" : "Pay Now (Mock)", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        : const Text("Place Order", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                    ),
                )
             ],
@@ -215,8 +178,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _buildPaymentOption(String title, String value, IconData icon) {
       return RadioListTile(
           value: value, 
-          groupValue: _paymentMethod, 
-          onChanged: (val) => setState(() => _paymentMethod = val.toString()),
+          groupValue: 'COD', 
+          onChanged: null,
           title: Text(title, style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
           secondary: Icon(icon, color: Colors.black54),
           activeColor: Theme.of(context).colorScheme.primary,

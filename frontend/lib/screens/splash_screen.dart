@@ -18,6 +18,10 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  static const double _storeLat = 31.431049819725455;
+  static const double _storeLng = 73.12663491103483;
+  static const double _maxRadiusKm = 6;
+
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
@@ -49,6 +53,23 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     if (!mounted) return;
 
+    final locationAllowed = await _checkServiceArea();
+    if (!mounted) return;
+
+    if (locationAllowed == null) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const LocationRequestScreen()),
+      );
+      return;
+    }
+
+    if (!locationAllowed) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const OutOfServiceScreen()),
+      );
+      return;
+    }
+
     if (success && authProvider.user != null && authProvider.user!['role'] == 'admin') {
          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const AdminDashboard()));
          return;
@@ -59,6 +80,33 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         MaterialPageRoute(builder: (_) => const MainScreen()),
       );
     }
+  }
+
+  Future<bool?> _checkServiceArea() async {
+    final isMobile = Platform.isAndroid || Platform.isIOS;
+    if (!isMobile) return true;
+
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return null;
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      return null;
+    }
+
+    final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    final distance = Geolocator.distanceBetween(
+      position.latitude,
+      position.longitude,
+      _storeLat,
+      _storeLng,
+    ) / 1000;
+
+    return distance <= _maxRadiusKm;
   }
   
   @override

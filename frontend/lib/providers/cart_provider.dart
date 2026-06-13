@@ -120,7 +120,7 @@ class CartProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String?> placeOrder(String address, String city, String phone, {String paymentMethod = 'COD', Map<String, dynamic>? paymentResult}) async {
+  Future<String?> placeOrder(String street, String area, String city, String phone, {String paymentMethod = 'COD'}) async {
     final url = '/orders';
     final orderItems = _items.values.map((cp) => {
       'product': cp.productId,
@@ -132,53 +132,49 @@ class CartProvider with ChangeNotifier {
     }).toList();
 
     Map<String, dynamic>? locationData;
-    // Geolocator only supported on Android/iOS
     final isMobile = Platform.isAndroid || Platform.isIOS;
-    if (isMobile) {
-      try {
-        // Best effort location capture
-        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (serviceEnabled) {
-          LocationPermission permission = await Geolocator.checkPermission();
-          if (permission == LocationPermission.denied) {
-            permission = await Geolocator.requestPermission();
-          }
 
-          if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-            Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-            locationData = {
-              'type': 'Point',
-              'coordinates': [position.longitude, position.latitude]
-            };
-          }
-        }
-      } catch (e) {
-        print("Error getting location: $e");
-        // Continue without location
+    if (!isMobile) {
+      return 'Location-based ordering is only available on Android and iOS.';
+    }
+
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        return 'Please enable location services to place an order.';
       }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        return 'Location permission is required to place an order.';
+      }
+
+      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      locationData = {
+        'type': 'Point',
+        'coordinates': [position.longitude, position.latitude]
+      };
+    } catch (e) {
+      return 'Could not verify your location. Please try again.';
     }
 
     try {
       final data = {
         'orderItems': orderItems,
         'shippingAddress': {
-          'address': address,
+          'street': street,
+          'area': area,
           'city': city,
           'phone': phone,
         },
         'paymentMethod': paymentMethod,
         'totalPrice': totalAmount,
+        'location': locationData,
       };
-
-      if (locationData != null) {
-        data['location'] = locationData;
-      }
-
-      if (paymentResult != null) {
-          data['paymentResult'] = paymentResult;
-          data['isPaid'] = true;
-          data['paidAt'] = DateTime.now().toIso8601String();
-      }
 
       await _apiService.dio.post(url, data: data);
       clear();

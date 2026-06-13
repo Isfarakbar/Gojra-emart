@@ -4,13 +4,17 @@ const User = require('../models/User');
 const protect = async (req, res, next) => {
     let token;
 
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    const cookieToken = getCookieToken(req);
+
+    if ((req.headers.authorization && req.headers.authorization.startsWith('Bearer')) || cookieToken) {
         try {
-            token = req.headers.authorization.split(' ')[1];
+            token = cookieToken || req.headers.authorization.split(' ')[1];
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
             req.user = await User.findById(decoded.id).select('-password');
-            console.log('Auth Success user:', req.user._id);
+            if (!req.user) {
+                return res.status(401).json({ message: 'Not authorized, user not found' });
+            }
             next();
         } catch (error) {
             console.error('Auth Failed:', error);
@@ -22,6 +26,20 @@ const protect = async (req, res, next) => {
         console.error('Auth Failed: No Token');
         res.status(401).json({ message: 'Not authorized, no token' });
     }
+};
+
+const getCookieToken = (req) => {
+    const cookieHeader = req.headers.cookie;
+    if (!cookieHeader) return null;
+
+    const cookies = Object.fromEntries(
+        cookieHeader.split(';').map(cookie => {
+            const [key, ...value] = cookie.trim().split('=');
+            return [key, decodeURIComponent(value.join('='))];
+        })
+    );
+
+    return cookies.adminToken || null;
 };
 
 const admin = (req, res, next) => {

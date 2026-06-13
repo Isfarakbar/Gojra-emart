@@ -2,14 +2,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart';
 
 class ApiService {
-  // -----------------------------------------------------------------------
   // BASE URL CONFIGURATION
-  // - Windows desktop / iOS Simulator:  http://127.0.0.1:5000/api
-  // - Android Emulator (AVD):           http://10.0.2.2:5000/api
-  // - Physical Android device:          http://<YOUR_MACHINE_LAN_IP>:5000/api
-  //   e.g. http://192.168.1.5:5000/api
-  // -----------------------------------------------------------------------
-  static const String baseUrl = 'http://127.0.0.1:5000/api';
+  static const String baseUrl = 'https://gojra-emart-backend.onrender.com/api';
 
   final Dio _dio = Dio(BaseOptions(
     baseUrl: baseUrl,

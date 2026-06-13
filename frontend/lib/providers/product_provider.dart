@@ -19,7 +19,7 @@ class ProductProvider with ChangeNotifier {
     notifyListeners();
     try {
       final response = await _apiService.dio.get('/products');
-      _products = response.data;
+      _products = response.data is Map ? response.data['products'] ?? [] : response.data;
     } catch (e) {
       _errorMessage = "Failed to load products. Check connection.";
       print("Error fetching products: $e");
@@ -103,7 +103,7 @@ class ProductProvider with ChangeNotifier {
       notifyListeners();
       try {
           final response = await _apiService.dio.get('/products?keyword=$query');
-          _searchResults = response.data;
+          _searchResults = response.data is Map ? response.data['products'] ?? [] : response.data;
       } catch (e) {
           print("Error searching products: $e");
       }

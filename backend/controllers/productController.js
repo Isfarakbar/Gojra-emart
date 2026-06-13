@@ -1,21 +1,24 @@
 const Product = require('../models/Product');
+const PRODUCT_PAGE_SIZE = 20;
 
 // @desc    Get all products
 // @route   GET /api/products
 // @access  Public
 const getProducts = async (req, res) => {
     try {
-        const keyword = req.query.keyword ? {
-            name: {
-                $regex: req.query.keyword,
-                $options: 'i'
-            }
-        } : {};
-
+        const page = Math.max(Number(req.query.page) || 1, 1);
+        const keyword = req.query.keyword ? { $text: { $search: req.query.keyword } } : {};
         const category = req.query.category ? { category: req.query.category } : {};
+        const query = { ...keyword, ...category };
 
-        const products = await Product.find({ ...keyword, ...category }).populate('category', 'name image');
-        res.json(products);
+        const products = await Product.find(query)
+            .populate('category', 'name image')
+            .sort(req.query.keyword ? { score: { $meta: 'textScore' } } : { createdAt: -1 })
+            .skip((page - 1) * PRODUCT_PAGE_SIZE)
+            .limit(PRODUCT_PAGE_SIZE);
+        const total = await Product.countDocuments(query);
+
+        res.json({ products, page, limit: PRODUCT_PAGE_SIZE, total, pages: Math.ceil(total / PRODUCT_PAGE_SIZE) });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -71,13 +74,13 @@ const updateProduct = async (req, res) => {
         const product = await Product.findById(req.params.id);
 
         if (product) {
-            product.name = name || product.name;
-            product.price = price || product.price;
-            product.description = description || product.description;
-            product.imageUrl = image || product.imageUrl;
-            product.category = category || product.category;
-            product.stock = stock || product.stock;
-            product.variants = variants || product.variants;
+            product.name = name ?? product.name;
+            product.price = price ?? product.price;
+            product.description = description ?? product.description;
+            product.imageUrl = image ?? product.imageUrl;
+            product.category = category ?? product.category;
+            product.stock = stock ?? product.stock;
+            product.variants = variants ?? product.variants;
 
             const updatedProduct = await product.save();
             res.json(updatedProduct);

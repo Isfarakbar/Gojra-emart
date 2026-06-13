@@ -1,10 +1,28 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET, {
         expiresIn: '30d',
+    });
+};
+
+const setAuthCookie = (res, token) => {
+    res.cookie('adminToken', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+};
+
+const clearAuthCookie = (res) => {
+    res.clearCookie('adminToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     });
 };
 
@@ -59,6 +77,8 @@ const loginUser = async (req, res) => {
         const user = await User.findOne({ email });
 
         if (user && (await user.matchPassword(password))) {
+            const token = generateToken(user._id);
+            setAuthCookie(res, token);
             res.json({
                 _id: user._id,
                 name: user.name,
@@ -66,7 +86,7 @@ const loginUser = async (req, res) => {
                 phone: user.phone,
                 address: user.address,
                 role: user.role,
-                token: generateToken(user._id),
+                token,
             });
         } else {
             res.status(401).json({ message: 'Invalid email or password' });
@@ -185,15 +205,15 @@ const forgotPassword = async (req, res) => {
     try {
         const user = await User.findOne({ email });
         if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+            return res.json({ message: 'If an account exists, an OTP has been sent to that email.' });
         }
 
         // Generate 6-digit OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         
-        // Save OTP and expiration (15 minutes) to user
-        user.resetPasswordOTP = otp;
+        user.resetPasswordOTP = hashOTP(otp);
         user.resetPasswordExpires = Date.now() + 15 * 60 * 1000;
+        user.resetPasswordAttempts = 0;
         await user.save();
 
         // Send email
@@ -212,13 +232,14 @@ const forgotPassword = async (req, res) => {
                 html
             });
             console.log(`[AUTH] Sent password reset OTP to ${email}`);
-            res.json({ message: 'OTP sent to email successfully' });
+            res.json({ message: 'If an account exists, an OTP has been sent to that email.' });
         } catch (emailError) {
             console.error('Email send error:', emailError);
             user.resetPasswordOTP = undefined;
             user.resetPasswordExpires = undefined;
+            user.resetPasswordAttempts = 0;
             await user.save();
-            return res.status(500).json({ message: 'Email could not be sent. Please check SMTP configuration.' });
+            return res.status(500).json({ message: 'Unable to process password reset right now.' });
         }
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -233,7 +254,14 @@ const verifyOTP = async (req, res) => {
     try {
         const user = await User.findOne({ email });
         
-        if (!user || user.resetPasswordOTP !== otp || user.resetPasswordExpires < Date.now()) {
+        if (!user || !isOTPValid(user, otp)) {
+            if (user) {
+                user.resetPasswordAttempts = (user.resetPasswordAttempts || 0) + 1;
+                if (user.resetPasswordAttempts >= 5 || user.resetPasswordExpires < Date.now()) {
+                    clearResetOTP(user);
+                }
+                await user.save();
+            }
             return res.status(400).json({ message: 'Invalid or expired OTP' });
         }
 
@@ -252,14 +280,20 @@ const resetPassword = async (req, res) => {
         const user = await User.findOne({ email });
         
         // Final verification check to be safe
-        if (!user || user.resetPasswordOTP !== otp || user.resetPasswordExpires < Date.now()) {
+        if (!user || !isOTPValid(user, otp)) {
+            if (user) {
+                user.resetPasswordAttempts = (user.resetPasswordAttempts || 0) + 1;
+                if (user.resetPasswordAttempts >= 5 || user.resetPasswordExpires < Date.now()) {
+                    clearResetOTP(user);
+                }
+                await user.save();
+            }
             return res.status(400).json({ message: 'Invalid or expired OTP' });
         }
 
         // Update password
         user.password = newPassword; // Pre-save hook will hash it
-        user.resetPasswordOTP = undefined;
-        user.resetPasswordExpires = undefined;
+        clearResetOTP(user);
         await user.save();
 
         res.json({ message: 'Password reset successfully' });
@@ -268,5 +302,41 @@ const resetPassword = async (req, res) => {
     }
 };
 
-module.exports = { registerUser, loginUser, googleLogin, firebasePhoneLogin, forgotPassword, verifyOTP, resetPassword };
+const hashOTP = (otp) => {
+    return crypto.createHash('sha256').update(`${otp}:${process.env.JWT_SECRET}`).digest('hex');
+};
+
+const getMe = async (req, res) => {
+    res.json({
+        _id: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        phone: req.user.phone,
+        address: req.user.address,
+        role: req.user.role,
+    });
+};
+
+const logoutUser = async (req, res) => {
+    clearAuthCookie(res);
+    res.json({ message: 'Logged out successfully' });
+};
+
+const isOTPValid = (user, otp) => {
+    return Boolean(
+        user.resetPasswordOTP &&
+        user.resetPasswordExpires &&
+        user.resetPasswordExpires >= Date.now() &&
+        (user.resetPasswordAttempts || 0) < 5 &&
+        user.resetPasswordOTP === hashOTP(otp)
+    );
+};
+
+const clearResetOTP = (user) => {
+    user.resetPasswordOTP = undefined;
+    user.resetPasswordExpires = undefined;
+    user.resetPasswordAttempts = 0;
+};
+
+module.exports = { registerUser, loginUser, googleLogin, firebasePhoneLogin, forgotPassword, verifyOTP, resetPassword, getMe, logoutUser };
 

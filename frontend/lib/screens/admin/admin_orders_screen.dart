@@ -22,7 +22,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     try {
       final response = await ApiService().dio.get('/orders');
       setState(() {
-        _orders = response.data;
+        _orders = response.data is Map ? response.data['orders'] ?? [] : response.data;
         _isLoading = false;
       });
     } catch (e) {
@@ -58,7 +58,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                     children: [
                       ListTile(
                         title: const Text("Shipping Address"),
-                        subtitle: Text("${order['shippingAddress']['address']}, ${order['shippingAddress']['city']}\nPhone: ${order['shippingAddress']['phone']}"),
+                        subtitle: Text("${order['shippingAddress']['street']}, ${order['shippingAddress']['area']}, ${order['shippingAddress']['city']}\nPhone: ${order['shippingAddress']['phone']}"),
                       ),
                       ...((order['orderItems'] as List).map((item) => ListTile(
                             leading: Image.network(item['image'], width: 50, errorBuilder: (c,o,s)=>const Icon(Icons.broken_image)),
@@ -72,13 +72,18 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                           children: [
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
-                              onPressed: () => _updateStatus(order['_id'], 'Processing'), 
-                              child: const Text("Process")
+                              onPressed: () => _updateStatus(order['_id'], 'Confirmed'), 
+                              child: const Text("Confirm")
                             ),
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
-                              onPressed: () => _updateStatus(order['_id'], 'Shipped'), 
-                              child: const Text("Ship")
+                              onPressed: () => _updateStatus(order['_id'], 'Packing'), 
+                              child: const Text("Pack")
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange, foregroundColor: Colors.white),
+                              onPressed: () => _updateStatus(order['_id'], 'Out for Delivery'), 
+                              child: const Text("Dispatch")
                             ),
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),

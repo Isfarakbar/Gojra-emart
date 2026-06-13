@@ -5,7 +5,17 @@ const { protect, admin } = require('../middleware/authMiddleware');
 const router = express.Router();
 
 const storage = multer.memoryStorage();
-const upload = multer({ storage });
+const upload = multer({
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!allowedTypes.includes(file.mimetype)) {
+            return cb(new Error('Only JPEG, PNG, and WebP images are allowed'));
+        }
+        cb(null, true);
+    }
+});
 
 router.post('/', protect, admin, upload.single('image'), async (req, res) => {
     try {
@@ -34,6 +44,11 @@ router.post('/', protect, admin, upload.single('image'), async (req, res) => {
         console.error('Upload Error Details:', error);
         res.status(500).json({ message: 'Image upload failed', error: error.message });
     }
+}, (error, req, res, next) => {
+    if (error) {
+        return res.status(400).json({ message: error.message });
+    }
+    next();
 });
 
 module.exports = router;
