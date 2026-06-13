@@ -23,8 +23,8 @@ const orderSchema = new mongoose.Schema({
     status: { type: String, required: true, default: 'Placed', enum: ['Placed', 'Confirmed', 'Packing', 'Out for Delivery', 'Delivered', 'Cancelled'] },
     source: { type: String, default: 'App' }, // App or WhatsApp (if parsed)
     location: {
-        type: { type: String, default: 'Point' },
-        coordinates: { type: [Number], required: false } // [longitude, latitude]
+        latitude: { type: Number },
+        longitude: { type: Number }
     }
 }, { timestamps: true });
 

@@ -4,12 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../providers/product_provider.dart';
 import '../providers/auth_provider.dart'; 
 import '../providers/home_provider.dart';
-import 'product_detail_screen.dart';
-import 'cart_screen.dart';
-import 'login_screen.dart';
-import 'my_orders_screen.dart';
 import '../widgets/skeleton_loader.dart';
-import '../components/states.dart';
 import '../widgets/product_card.dart';
 import '../providers/wishlist_provider.dart';
 import 'search_screen.dart';
@@ -76,6 +71,31 @@ class _HomeScreenState extends State<HomeScreen> {
                     expandedHeight: 120.0,
                     automaticallyImplyLeading: false,
                     elevation: 0,
+                    actions: [
+                      Consumer<AuthProvider>(
+                        builder: (context, auth, _) {
+                          final photoUrl = (auth.user?['photoUrl'] ?? '').toString();
+                          final name = (auth.user?['name'] ?? '').toString();
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 14, top: 8),
+                            child: CircleAvatar(
+                              radius: 18,
+                              backgroundColor: Colors.white,
+                              backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+                              child: photoUrl.isEmpty
+                                  ? Text(
+                                      name.isNotEmpty ? name[0].toUpperCase() : 'G',
+                                      style: GoogleFonts.poppins(
+                                        color: theme.colorScheme.primary,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                     flexibleSpace: FlexibleSpaceBar(
                       background: Container(color: theme.colorScheme.primary),
                       title: SizedBox(

@@ -21,8 +21,8 @@ interface Order {
     status: string;
     createdAt: string;
     location?: {
-        type: string;
-        coordinates: number[];
+        latitude: number;
+        longitude: number;
     };
 }
 
@@ -194,16 +194,16 @@ export default function OrdersPage() {
                                         {selectedOrder.shippingAddress.phone}
                                     </p>
 
-                                    {selectedOrder.location && selectedOrder.location.coordinates && (
+                                    {selectedOrder.location && selectedOrder.location.latitude != null && selectedOrder.location.longitude != null && (
                                         <div className="mt-4">
                                             <a
-                                                href={`https://www.google.com/maps?q=${selectedOrder.location.coordinates[1]},${selectedOrder.location.coordinates[0]}`}
+                                                href={`https://maps.google.com/?q=${selectedOrder.location.latitude},${selectedOrder.location.longitude}`}
                                                 target="_blank"
                                                 rel="noreferrer"
                                                 className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-9 13-9 13s-9-7-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
-                                                View Live Location
+                                                View on Map
                                             </a>
                                         </div>
                                     )}

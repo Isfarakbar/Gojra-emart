@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io' show Platform;
 import 'package:geolocator/geolocator.dart';
 
@@ -61,7 +62,7 @@ class CartProvider with ChangeNotifier {
           id: existingCartItem.id,
           title: existingCartItem.title,
           quantity: existingCartItem.quantity + quantity,
-          price: existingCartItem.price, // Keep existing price or update? Assumed same
+          price: existingCartItem.price,
           image: existingCartItem.image,
           productId: existingCartItem.productId,
           variantUnit: existingCartItem.variantUnit,
@@ -131,35 +132,31 @@ class CartProvider with ChangeNotifier {
       'variant': cp.variantUnit,
     }).toList();
 
+    // Try to capture GPS location, but don't block the order if it fails
     Map<String, dynamic>? locationData;
-    final isMobile = Platform.isAndroid || Platform.isIOS;
+    final isMobile = !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
-    if (!isMobile) {
-      return 'Location-based ordering is only available on Android and iOS.';
-    }
+    if (isMobile) {
+      try {
+        final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (serviceEnabled) {
+          LocationPermission permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.denied) {
+            permission = await Geolocator.requestPermission();
+          }
 
-    try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        return 'Please enable location services to place an order.';
+          if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+            final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+            locationData = {
+              'latitude': position.latitude,
+              'longitude': position.longitude,
+            };
+          }
+        }
+      } catch (e) {
+        // GPS failed — proceed without location
+        print('Location capture failed: $e');
       }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        return 'Location permission is required to place an order.';
-      }
-
-      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      locationData = {
-        'type': 'Point',
-        'coordinates': [position.longitude, position.latitude]
-      };
-    } catch (e) {
-      return 'Could not verify your location. Please try again.';
     }
 
     try {

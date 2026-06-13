@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-// import 'package:google_sign_in/google_sign_in.dart'; // Uncomment for Android
+import 'package:google_sign_in/google_sign_in.dart';
 import '../services/api_service.dart';
 
 class AuthProvider with ChangeNotifier {
@@ -15,9 +15,49 @@ class AuthProvider with ChangeNotifier {
   bool get isAuthenticated => _token != null;
   Map<String, dynamic>? get user => _user;
   String? get token => _token;
+  bool get needsProfileSetup {
+    final name = (_user?['name'] ?? '').toString().trim();
+    final address = (_user?['address'] ?? '').toString().trim();
+    return _token != null &&
+        (name.isEmpty || name.toLowerCase() == 'new user' || address.isEmpty);
+  }
 
   Future<String?> googleLogin() async {
-    return 'Google Sign-In is only supported on Android/iOS. Please test on a real device.';
+    try {
+      final signIn = GoogleSignIn.instance;
+      await signIn.initialize();
+      final account = await signIn.authenticate();
+      final idToken = account.authentication.idToken;
+
+      if (idToken == null) {
+        return 'Google could not verify your account. Please try again.';
+      }
+
+      final response = await _apiService.dio.post('/auth/google', data: {
+        'token': idToken,
+      });
+
+      if (response.statusCode == 200) {
+        _token = response.data['token'];
+        _user = {
+          ...Map<String, dynamic>.from(response.data),
+          'photoUrl': account.photoUrl,
+        };
+        await _saveSession();
+        notifyListeners();
+        return null;
+      }
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        return 'Google sign-in was cancelled.';
+      }
+      return e.description ?? 'Google sign-in failed.';
+    } on DioException catch (e) {
+      return e.response?.data['message'] ?? 'Google sign-in failed.';
+    } catch (e) {
+      return 'Google sign-in is not configured on this device yet.';
+    }
+    return 'Google sign-in failed.';
   }
 
   Future<String?> login(String email, String password) async {
@@ -30,7 +70,7 @@ class AuthProvider with ChangeNotifier {
       if (response.statusCode == 200) {
         _token = response.data['token'];
         _user = response.data;
-        await _saveToken(_token!);
+        await _saveSession();
         notifyListeners();
         return null; // No error
       }
@@ -57,7 +97,7 @@ class AuthProvider with ChangeNotifier {
       if (response.statusCode == 201) {
         _token = response.data['token'];
         _user = response.data;
-        await _saveToken(_token!);
+        await _saveSession();
         notifyListeners();
         return null; // No error
       }
@@ -90,7 +130,11 @@ class AuthProvider with ChangeNotifier {
       if (response.statusCode == 200) {
         // Update local user data
         // API returns the full user object
-        _user = response.data;
+        _user = {
+          ...Map<String, dynamic>.from(response.data),
+          if (_user?['photoUrl'] != null) 'photoUrl': _user!['photoUrl'],
+        };
+        await _saveSession();
         notifyListeners();
         return null;
       }
@@ -176,8 +220,7 @@ class AuthProvider with ChangeNotifier {
         _user = response.data;
         _token = _user!['token'];
         
-        await _storage.write(key: 'token', value: _token);
-        await _storage.write(key: 'user', value: jsonEncode(_user));
+        await _saveSession();
         
         notifyListeners();
         return null; // Success
@@ -195,13 +238,32 @@ class AuthProvider with ChangeNotifier {
     if (token == null) return false;
     
     _token = token;
-    // Optionally fetch user profile again here using the token
-    // For now, we assume token validity or let the API reject it later
-    notifyListeners();
-    return true;
+    final storedUser = await _storage.read(key: 'user');
+    if (storedUser != null) {
+      _user = jsonDecode(storedUser);
+    }
+
+    try {
+      final response = await _apiService.dio.get('/users/profile');
+      _user = {
+        ...Map<String, dynamic>.from(response.data),
+        if (_user?['photoUrl'] != null) 'photoUrl': _user!['photoUrl'],
+      };
+      await _saveSession();
+      notifyListeners();
+      return true;
+    } catch (_) {
+      await logout();
+      return false;
+    }
   }
 
-  Future<void> _saveToken(String token) async {
-    await _storage.write(key: 'token', value: token);
+  Future<void> _saveSession() async {
+    if (_token != null) {
+      await _storage.write(key: 'token', value: _token);
+    }
+    if (_user != null) {
+      await _storage.write(key: 'user', value: jsonEncode(_user));
+    }
   }
 }

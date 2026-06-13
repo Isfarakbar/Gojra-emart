@@ -3,8 +3,6 @@ const Product = require('../models/Product');
 const Notification = require('../models/Notification');
 const sendNotification = require('../utils/sendNotification');
 
-const STORE_CENTER = { lat: 31.431049819725455, lng: 73.12663491103483 };
-const MAX_RADIUS_KM = 6;
 const ORDER_PAGE_SIZE = 20;
 const VALID_ORDER_STATUSES = ['Placed', 'Confirmed', 'Packing', 'Out for Delivery', 'Delivered', 'Cancelled'];
 
@@ -23,23 +21,17 @@ const addOrderItems = async (req, res) => {
             return res.status(400).json({ message: 'Only Cash on Delivery is available.' });
         }
 
-        if (!location || !Array.isArray(location.coordinates) || location.coordinates.length !== 2) {
-            return res.status(400).json({ message: 'Location is required to place an order.' });
-        }
-
-        const [lng, lat] = location.coordinates;
-        const distance = getDistanceKm(lat, lng, STORE_CENTER.lat, STORE_CENTER.lng);
-
-        console.log(`Location check: user=${lat},${lng} store=${STORE_CENTER.lat},${STORE_CENTER.lng} distance=${distance.toFixed(2)}km`);
-
-        if (distance > MAX_RADIUS_KM) {
-            return res.status(400).json({
-                message: `Sorry, we only deliver within ${MAX_RADIUS_KM}km of our store. Your location is ${distance.toFixed(1)}km away.`
-            });
-        }
-
         if (!shippingAddress?.street || !shippingAddress?.area || !shippingAddress?.city || !shippingAddress?.phone) {
             return res.status(400).json({ message: 'Complete shipping address is required.' });
+        }
+
+        // Accept location if provided, but don't block the order if missing
+        let locationData = null;
+        if (location && location.latitude != null && location.longitude != null) {
+            locationData = {
+                latitude: Number(location.latitude),
+                longitude: Number(location.longitude)
+            };
         }
 
         const validatedItems = [];
@@ -94,7 +86,7 @@ const addOrderItems = async (req, res) => {
             shippingAddress,
             paymentMethod: 'COD',
             totalPrice: calculatedTotal,
-            location
+            location: locationData
         });
 
         const createdOrder = await order.save();
@@ -216,19 +208,3 @@ module.exports = {
     getOrders,
     updateOrderStatus
 };
-
-function deg2rad(deg) {
-    return deg * (Math.PI / 180);
-}
-
-function getDistanceKm(lat1, lng1, lat2, lng2) {
-    const R = 6371;
-    const dLat = deg2rad(lat1 - lat2);
-    const dLon = deg2rad(lng1 - lng2);
-    const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(deg2rad(lat2)) * Math.cos(deg2rad(lat1)) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-}
