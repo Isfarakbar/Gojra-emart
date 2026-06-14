@@ -2,6 +2,8 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const sendEmail = require('../utils/sendEmail');
+const admin = require('firebase-admin');
 
 const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -96,9 +98,6 @@ const loginUser = async (req, res) => {
     }
 };
 
-const { OAuth2Client } = require('google-auth-library');
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
 // @desc    Google Login/Signup
 // @route   POST /api/auth/google
 // @access  Public
@@ -106,12 +105,9 @@ const googleLogin = async (req, res) => {
     const { token } = req.body;
 
     try {
-        // Verify Token
-        const ticket = await client.verifyIdToken({
-            idToken: token,
-            audience: process.env.GOOGLE_CLIENT_ID,
-        });
-        const { name, email, sub: googleId } = ticket.getPayload();
+        // Verify Firebase ID token (sent from Flutter after Firebase Google Sign-In)
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        const { name, email, uid: googleId } = decodedToken;
 
         // Check if user exists
         let user = await User.findOne({ email });
@@ -125,7 +121,7 @@ const googleLogin = async (req, res) => {
         } else {
             // New User - Create
             user = await User.create({
-                name,
+                name: name || 'New User',
                 email,
                 googleId,
                 password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10), // Random password
@@ -149,9 +145,6 @@ const googleLogin = async (req, res) => {
     }
 };
 
-const sendEmail = require('../utils/sendEmail');
-const { getAuth } = require('firebase-admin/auth');
-
 // @desc    Firebase Phone Auth Login
 // @route   POST /api/auth/phone
 // @access  Public
@@ -164,7 +157,7 @@ const firebasePhoneLogin = async (req, res) => {
 
     try {
         // Verify the token with Firebase Admin SDK
-        const decodedToken = await getAuth().verifyIdToken(firebaseIdToken);
+        const decodedToken = await admin.auth().verifyIdToken(firebaseIdToken);
         const { phone_number, uid } = decodedToken;
 
         if (!phone_number) {
@@ -339,4 +332,3 @@ const clearResetOTP = (user) => {
 };
 
 module.exports = { registerUser, loginUser, googleLogin, firebasePhoneLogin, forgotPassword, verifyOTP, resetPassword, getMe, logoutUser };
-
