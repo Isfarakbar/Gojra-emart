@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
-const admin = require('firebase-admin');
+const { getAuth } = require('firebase-admin/auth');
 
 const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -106,7 +106,7 @@ const googleLogin = async (req, res) => {
 
     try {
         // Verify Firebase ID token (sent from Flutter after Firebase Google Sign-In)
-        const decodedToken = await admin.auth().verifyIdToken(token);
+        const decodedToken = await getAuth().verifyIdToken(token);
         const { name, email, uid: googleId } = decodedToken;
 
         // Check if user exists
@@ -158,7 +158,7 @@ const firebasePhoneLogin = async (req, res) => {
 
     try {
         // Verify the token with Firebase Admin SDK
-        const decodedToken = await admin.auth().verifyIdToken(firebaseIdToken);
+        const decodedToken = await getAuth().verifyIdToken(firebaseIdToken);
         const { phone_number, uid } = decodedToken;
 
         if (!phone_number) {
