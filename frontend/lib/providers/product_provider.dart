@@ -60,9 +60,6 @@ class ProductProvider with ChangeNotifier {
   bool get isSearching => _isSearching;
 
   void searchProducts(String query) {
-     // Keep local search for Home Screen usage if needed, or deprecate it.
-     // For Phase 6, we generally use the API search for the Dedicated Search Screen.
-     // But let's leave this for backward compatibility if HomeScreen uses it.
     _searchQuery = query;
     if (query.isEmpty) {
       _filteredProducts = [];
@@ -81,11 +78,8 @@ class ProductProvider with ChangeNotifier {
       _filteredProducts = _products;
     } else {
       _filteredProducts = _products.where((product) {
-         // Check if product has a category field, or strictly match name for now if simplified
-         // Assuming product['category'] exists or matching against keywords
          final cat = product['category'].toString().toLowerCase();
          final target = category.toLowerCase();
-         // Fallback to name search if category field is missing/weak in current data
          final name = product['name'].toString().toLowerCase();
          return cat.contains(target) || name.contains(target);
       }).toList();
@@ -109,5 +103,32 @@ class ProductProvider with ChangeNotifier {
       }
       _isSearching = false;
       notifyListeners();
+  }
+
+  Future<List<Map<String, dynamic>>> getSearchSuggestions(String query) async {
+    if (query.trim().length < 2) {
+      return [];
+    }
+    try {
+      final response = await _apiService.dio.get('/products/search?q=$query');
+      if (response.data is List) {
+        return List<Map<String, dynamic>>.from(response.data);
+      }
+    } catch (e) {
+      print("Error fetching suggestions: $e");
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>?> getProductById(String id) async {
+    try {
+      final response = await _apiService.dio.get('/products/$id');
+      if (response.data is Map) {
+        return Map<String, dynamic>.from(response.data);
+      }
+    } catch (e) {
+      print("Error fetching product by id: $e");
+    }
+    return null;
   }
 }

@@ -8,6 +8,7 @@ import '../widgets/skeleton_loader.dart';
 import '../widgets/product_card.dart';
 import '../providers/wishlist_provider.dart';
 import 'search_screen.dart';
+import '../widgets/live_search_bar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -98,34 +99,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                     flexibleSpace: FlexibleSpaceBar(
                       background: Container(color: theme.colorScheme.primary),
-                      title: SizedBox(
+                      title: const SizedBox(
                         height: 45,
-                        child: GestureDetector(
-                          onTap: () {
-                             Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SearchScreen()));
-                          },
-                          child: Container(
-                             margin: const EdgeInsets.symmetric(horizontal: 16),
-                             padding: const EdgeInsets.symmetric(horizontal: 12),
-                             decoration: BoxDecoration(
-                               color: Colors.white,
-                               borderRadius: BorderRadius.circular(12),
-                             ),
-                             child: Row(
-                               children: [
-                                 Icon(Icons.search, color: Colors.grey[400], size: 20),
-                                 const SizedBox(width: 8),
-                                 Expanded(
-                                   child: Text(
-                                     "Search 5000+ products", 
-                                     style: GoogleFonts.inter(color: Colors.grey[400], fontSize: 12),
-                                     overflow: TextOverflow.ellipsis,
-                                   ),
-                                 ),
-                               ],
-                             ),
-                          ),
-                        ),
+                        child: LiveSearchBar(),
                       ),
                       centerTitle: true,
                       titlePadding: const EdgeInsets.only(bottom: 16),

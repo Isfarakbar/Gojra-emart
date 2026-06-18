@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
 import '../services/api_service.dart';
 
 class AuthProvider with ChangeNotifier {
@@ -25,16 +26,25 @@ class AuthProvider with ChangeNotifier {
   Future<String?> googleLogin() async {
     try {
       final signIn = GoogleSignIn.instance;
-      await signIn.initialize();
+      await signIn.initialize(serverClientId: '357186664125-bb22gkb81i3klrcl7jttc1sive0vake6.apps.googleusercontent.com');
       final account = await signIn.authenticate();
-      final idToken = account.authentication.idToken;
+      final googleIdToken = account.authentication.idToken;
 
-      if (idToken == null) {
+      if (googleIdToken == null) {
         return 'Google could not verify your account. Please try again.';
       }
 
+      // Sign into Firebase Auth with the Google credential to get a Firebase ID token
+      final credential = fb.GoogleAuthProvider.credential(idToken: googleIdToken);
+      final fbUser = await fb.FirebaseAuth.instance.signInWithCredential(credential);
+      final firebaseIdToken = await fbUser.user?.getIdToken();
+
+      if (firebaseIdToken == null) {
+        return 'Firebase authentication failed. Please try again.';
+      }
+
       final response = await _apiService.dio.post('/auth/google', data: {
-        'token': idToken,
+        'token': firebaseIdToken,
       });
 
       if (response.statusCode == 200) {

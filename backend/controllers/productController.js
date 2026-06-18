@@ -110,10 +110,49 @@ const deleteProduct = async (req, res) => {
     }
 };
 
+// @desc    Search products with live suggestions
+// @route   GET /api/products/search
+// @access  Public
+const searchProducts = async (req, res) => {
+    try {
+        const query = req.query.q;
+        if (!query || query.trim().length < 2) {
+            return res.json([]);
+        }
+
+        const products = await Product.find(
+            { $text: { $search: query } },
+            { score: { $meta: 'textScore' } }
+        )
+        .sort({ score: { $meta: 'textScore' } })
+        .limit(6)
+        .select('_id name imageUrl variants category price')
+        .populate('category', 'name')
+        .lean();
+
+        const formattedProducts = products.map(product => {
+            return {
+                _id: product._id,
+                name: product.name,
+                images: product.imageUrl ? [product.imageUrl] : [],
+                variants: product.variants && product.variants.length > 0 
+                    ? [{ price: product.variants[0].price }] 
+                    : [{ price: product.price }],
+                category: product.category
+            };
+        });
+
+        res.json(formattedProducts);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     getProducts,
     getProductById,
     createProduct,
     updateProduct,
-    deleteProduct
+    deleteProduct,
+    searchProducts
 };
