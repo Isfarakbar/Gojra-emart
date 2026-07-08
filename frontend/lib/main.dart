@@ -10,15 +10,12 @@ import 'providers/product_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/wishlist_provider.dart';
 import 'providers/home_provider.dart';
-import 'services/api_service.dart';
+import 'providers/store_settings_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // TODO: Uncomment these lines AFTER running `flutterfire configure`
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  final apiService = ApiService();
 
   runApp(const MyApp());
 }
@@ -35,6 +32,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CartProvider()),
         ChangeNotifierProvider(create: (_) => WishlistProvider()),
         ChangeNotifierProvider(create: (_) => HomeProvider()),
+        ChangeNotifierProvider(create: (_) => StoreSettingsProvider()),
       ],
       child: MaterialApp(
         title: 'Gojra E-Mart',

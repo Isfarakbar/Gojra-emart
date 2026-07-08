@@ -9,6 +9,7 @@ import 'notifications_screen.dart';
 import 'help_support_screen.dart';
 import 'my_orders_screen.dart';
 import 'cart_screen.dart';
+import 'addresses_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -38,7 +39,8 @@ class ProfileScreen extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 50,
-                    backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                    backgroundColor:
+                        theme.colorScheme.primary.withValues(alpha: 0.1),
                     child: Text(
                       (user?['name'] ?? "G")[0].toUpperCase(),
                       style: GoogleFonts.poppins(fontSize: 40, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
@@ -101,7 +103,7 @@ class ProfileScreen extends StatelessWidget {
                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WishlistScreen()));
             }),
             _buildProfileItem(context, icon: Icons.location_on_outlined, title: "My Addresses", onTap: () {
-                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const EditProfileScreen()));
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AddressesScreen()));
             }),
             _buildProfileItem(context, icon: Icons.notifications_outlined, title: "Notifications", onTap: () {
                 Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen()));
@@ -125,7 +127,10 @@ class ProfileScreen extends StatelessWidget {
               },
               leading: Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 child: const Icon(Icons.logout, color: Colors.red),
               ),
               title: Text("Logout", style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.red)),

@@ -7,13 +7,18 @@ const rateLimit = require('express-rate-limit');
 require('./config/firebase'); // Initialize Firebase Admin SDK
 
 const app = express();
+app.set('trust proxy', 1);
 
-// CORS - Allow admin panel and flutter app
-const allowedOrigins = [
-    'http://localhost:3000', // Next.js Admin
-    'http://localhost:3001',
-    process.env.ADMIN_PANEL_URL,
-].filter(Boolean);
+const configuredOrigins = (process.env.ALLOWED_ORIGINS || process.env.ADMIN_PANEL_URL || '')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+const developmentOrigins = process.env.NODE_ENV === 'production'
+    ? []
+    : ['http://localhost:3000', 'http://localhost:3001'];
+
+const allowedOrigins = [...new Set([...configuredOrigins, ...developmentOrigins])];
 
 app.use(cors({
     origin: function (origin, callback) {
@@ -66,6 +71,8 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const layoutRoutes = require('./routes/layoutRoutes');
+const storeSettingsRoutes = require('./routes/storeSettingsRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
@@ -78,6 +85,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/layout', layoutRoutes);
+app.use('/api/settings', storeSettingsRoutes);
+app.use('/api/reports', reportRoutes);
 
 // Health check
 app.get('/', (req, res) => {

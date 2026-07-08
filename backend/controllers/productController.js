@@ -44,17 +44,19 @@ const getProductById = async (req, res) => {
 // @route   POST /api/products
 // @access  Private/Admin
 const createProduct = async (req, res) => {
-    const { name, price, description, image, category, stock, variants } = req.body;
+    const { name, price, oldPrice, description, image, category, stock, variants, isFeatured } = req.body;
 
     try {
         const product = new Product({
             name,
             price,
+            oldPrice,
             description,
             imageUrl: image,
             category,
             stock,
-            variants
+            variants,
+            isFeatured
         });
 
         const createdProduct = await product.save();
@@ -68,7 +70,7 @@ const createProduct = async (req, res) => {
 // @route   PUT /api/products/:id
 // @access  Private/Admin
 const updateProduct = async (req, res) => {
-    const { name, price, description, image, category, stock, variants } = req.body;
+    const { name, price, oldPrice, description, image, category, stock, variants, isFeatured, isActive } = req.body;
 
     try {
         const product = await Product.findById(req.params.id);
@@ -76,11 +78,14 @@ const updateProduct = async (req, res) => {
         if (product) {
             product.name = name ?? product.name;
             product.price = price ?? product.price;
+            product.oldPrice = oldPrice ?? product.oldPrice;
             product.description = description ?? product.description;
             product.imageUrl = image ?? product.imageUrl;
             product.category = category ?? product.category;
             product.stock = stock ?? product.stock;
             product.variants = variants ?? product.variants;
+            product.isFeatured = isFeatured ?? product.isFeatured;
+            product.isActive = isActive ?? product.isActive;
 
             const updatedProduct = await product.save();
             res.json(updatedProduct);
@@ -148,11 +153,41 @@ const searchProducts = async (req, res) => {
     }
 };
 
+// @desc    Get low-stock products
+// @route   GET /api/products/low-stock
+// @access  Private/Admin
+const getLowStockProducts = async (req, res) => {
+    try {
+        const threshold = Math.max(Number(req.query.threshold) || 5, 0);
+        const products = await Product.find({
+            isActive: true,
+            $or: [
+                { stock: { $lte: threshold } },
+                { variants: { $elemMatch: { stock: { $lte: threshold } } } }
+            ]
+        })
+            .populate('category', 'name')
+            .sort({ stock: 1, name: 1 })
+            .limit(50)
+            .lean();
+
+        const formattedProducts = products.map(product => ({
+            ...product,
+            lowStockVariants: (product.variants || []).filter(variant => variant.stock <= threshold)
+        }));
+
+        res.json({ products: formattedProducts, threshold });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     getProducts,
     getProductById,
     createProduct,
     updateProduct,
     deleteProduct,
-    searchProducts
+    searchProducts,
+    getLowStockProducts
 };

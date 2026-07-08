@@ -20,10 +20,10 @@ class WishlistProvider with ChangeNotifier {
     } on DioException catch (e) {
       // 401 = not logged in — silently ignore
       if (e.response?.statusCode != 401) {
-        print('Error fetching wishlist: $e');
+        debugPrint('Error fetching wishlist: $e');
       }
     } catch (error) {
-      print('Error fetching wishlist: $error');
+      debugPrint('Error fetching wishlist: $error');
     }
   }
 
@@ -52,9 +52,9 @@ class WishlistProvider with ChangeNotifier {
         }
       }
     } on DioException catch (e) {
-      print('Error toggling wishlist: ${e.response?.data ?? e.message}');
+      debugPrint('Error toggling wishlist: ${e.response?.data ?? e.message}');
     } catch (error) {
-      print('Error toggling wishlist: $error');
+      debugPrint('Error toggling wishlist: $error');
     }
   }
 

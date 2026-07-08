@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-// import 'package:image_picker/image_picker.dart';
 import '../../services/api_service.dart';
 
 class AddEditProductScreen extends StatefulWidget {
@@ -18,9 +16,11 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   final _descController = TextEditingController();
   final _stockController = TextEditingController();
   final _imageUrlController = TextEditingController();
-  final _categoryController = TextEditingController(); // Ideally a dropdown
-  
+
+  List<dynamic> _categories = [];
+  String? _selectedCategoryId;
   bool _isLoading = false;
+  bool _isLoadingCategories = true;
 
   @override
   void initState() {
@@ -31,12 +31,43 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
       _descController.text = widget.product!['description'] ?? '';
       _stockController.text = widget.product!['stock'].toString();
       _imageUrlController.text = widget.product!['imageUrl'];
-      // _categoryController.text = widget.product!['category']['_id'];
+      final category = widget.product!['category'];
+      _selectedCategoryId = category is Map ? category['_id'] : category?.toString();
+    }
+    _fetchCategories();
+  }
+
+  Future<void> _fetchCategories() async {
+    try {
+      final response = await ApiService().dio.get('/categories');
+      if (!mounted) return;
+      setState(() {
+        _categories = response.data is List ? response.data : [];
+        if (_selectedCategoryId == null && _categories.isNotEmpty) {
+          _selectedCategoryId = _categories.first['_id'];
+        }
+        _isLoadingCategories = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading categories: $e');
+      if (!mounted) return;
+      setState(() => _isLoadingCategories = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to load categories')),
+      );
     }
   }
 
   Future<void> _saveProduct() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (_selectedCategoryId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a category')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     final api = ApiService().dio;
@@ -45,8 +76,8 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
       'price': double.parse(_priceController.text),
       'description': _descController.text,
       'stock': int.parse(_stockController.text),
-      'image': _imageUrlController.text, // Use uploaded URL here
-      'category': "60d0fe4f5311236168a109ca", // Placeholder Category ID, need to fetch
+      'imageUrl': _imageUrlController.text,
+      'category': _selectedCategoryId,
     };
 
     try {
@@ -57,11 +88,21 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
       }
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
-      print(e);
+      debugPrint('Error saving product: $e');
       if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error saving product")));
     } finally {
-       setState(() => _isLoading = false);
+       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _priceController.dispose();
+    _descController.dispose();
+    _stockController.dispose();
+    _imageUrlController.dispose();
+    super.dispose();
   }
 
   @override
@@ -79,12 +120,28 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
               TextFormField(controller: _descController, decoration: const InputDecoration(labelText: "Description")),
               TextFormField(controller: _stockController, decoration: const InputDecoration(labelText: "Stock"), keyboardType: TextInputType.number),
               TextFormField(controller: _imageUrlController, decoration: const InputDecoration(labelText: "Image URL")),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _categories.any((category) => category['_id'] == _selectedCategoryId)
+                    ? _selectedCategoryId
+                    : null,
+                decoration: const InputDecoration(labelText: "Category"),
+                items: _categories.map<DropdownMenuItem<String>>((category) {
+                  return DropdownMenuItem<String>(
+                    value: category['_id'],
+                    child: Text(category['name'] ?? 'Unnamed category'),
+                  );
+                }).toList(),
+                onChanged: _isLoadingCategories
+                    ? null
+                    : (value) => setState(() => _selectedCategoryId = value),
+                validator: (value) => value == null ? "Select a category" : null,
+              ),
               const SizedBox(height: 20),
-              // Image Picker Button here
               SizedBox(
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _saveProduct,
+                  onPressed: _isLoading || _isLoadingCategories ? null : _saveProduct,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: Colors.white,

@@ -1,9 +1,12 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiService {
-  // BASE URL CONFIGURATION
-  static const String baseUrl = 'https://gojra-emart-backend.onrender.com/api';
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://gojra-emart-backend.onrender.com/api',
+  );
 
   final Dio _dio = Dio(BaseOptions(
     baseUrl: baseUrl,
@@ -28,12 +31,11 @@ class ApiService {
       onResponse: (response, handler) {
         return handler.next(response);
       },
-      onError: (DioException e, handler) {
-        // Log errors for debugging
-        final statusCode = e.response?.statusCode;
-        final message = e.response?.data?['message'] ?? e.message;
-        print('🔴 API Error [$statusCode]: $message');
-        return handler.next(e);
+      onError: (DioException error, handler) {
+        final statusCode = error.response?.statusCode;
+        final message = error.response?.data?['message'] ?? error.message;
+        debugPrint('API Error [$statusCode]: $message');
+        return handler.next(error);
       },
     ));
   }

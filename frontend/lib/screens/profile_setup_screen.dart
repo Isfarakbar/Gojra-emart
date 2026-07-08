@@ -97,7 +97,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.08),
+                                  color: Colors.black.withValues(alpha: 0.08),
                                   blurRadius: 22,
                                   offset: const Offset(0, 10),
                                 ),
@@ -111,7 +111,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                                       child: Image.asset(
                                         'assets/logo.png',
                                         fit: BoxFit.contain,
-                                        errorBuilder: (_, __, ___) => Icon(
+                                        errorBuilder: (context, error, stackTrace) => Icon(
                                           Icons.person_rounded,
                                           size: 44,
                                           color: theme.colorScheme.primary,
@@ -267,9 +267,9 @@ class _InlineMessage extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.18)),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: Text(
         message,

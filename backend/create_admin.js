@@ -3,30 +3,39 @@ const mongoose = require('mongoose');
 const User = require('./models/User');
 
 const createAdmin = async () => {
+    const { ADMIN_NAME, ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_PHONE, ADMIN_ADDRESS, MONGO_URI } = process.env;
+
+    if (!MONGO_URI || !ADMIN_EMAIL || !ADMIN_PASSWORD) {
+        console.error('Missing required env values: MONGO_URI, ADMIN_EMAIL, ADMIN_PASSWORD');
+        process.exit(1);
+    }
+
+    if (ADMIN_PASSWORD.length < 10) {
+        console.error('ADMIN_PASSWORD must be at least 10 characters.');
+        process.exit(1);
+    }
+
     try {
-        await mongoose.connect(process.env.MONGO_URI);
+        await mongoose.connect(MONGO_URI);
         console.log('Connected to MongoDB');
 
-        const adminExists = await User.findOne({ email: 'admin@gmail.com' });
+        const adminExists = await User.findOne({ email: ADMIN_EMAIL });
 
         if (adminExists) {
             console.log('Admin user already exists');
             process.exit();
         }
 
-        const adminUser = await User.create({
-            name: 'Admin User',
-            email: 'admin@gmail.com',
-            password: '123456', // Will be hashed by pre-save hook
-            phone: '1234567890',
+        await User.create({
+            name: ADMIN_NAME || 'Store Admin',
+            email: ADMIN_EMAIL,
+            password: ADMIN_PASSWORD,
+            phone: ADMIN_PHONE || '',
             role: 'admin',
-            address: 'Admin HQ'
+            address: ADMIN_ADDRESS || ''
         });
 
-        console.log('Admin user created successfully');
-        console.log('Email: admin@gmail.com');
-        console.log('Password: 123456');
-
+        console.log(`Admin user created successfully: ${ADMIN_EMAIL}`);
         process.exit();
     } catch (err) {
         console.error(err);

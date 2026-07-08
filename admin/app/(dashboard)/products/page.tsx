@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { Plus, Trash2, Edit, Loader2, UploadCloud } from 'lucide-react';
+import { AlertTriangle, Plus, Trash2, Edit, Loader2, UploadCloud } from 'lucide-react';
 import Image from 'next/image';
 
 interface Product {
     _id: string;
     name: string;
+    description?: string;
     price: number;
     oldPrice?: number;
     isFeatured?: boolean;
@@ -15,6 +16,7 @@ interface Product {
     category: { _id: string; name: string } | string;
     imageUrl: string;
     variants?: { unit: string; price: number; stock: number; oldPrice?: number }[];
+    lowStockVariants?: { unit: string; price: number; stock: number; oldPrice?: number }[];
 }
 
 interface Category {
@@ -42,6 +44,9 @@ export default function ProductsPage() {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -58,25 +63,28 @@ export default function ProductsPage() {
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
 
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async (targetPage = page) => {
         try {
             const [prodRes, catRes] = await Promise.all([
-                api.get('/products'),
+                api.get('/products', { params: { page: targetPage } }),
                 api.get('/categories')
             ]);
             setProducts(prodRes.data.products ?? prodRes.data);
+            setTotalPages(prodRes.data.pages ?? 1);
             setCategories(catRes.data);
+            const lowStockRes = await api.get('/products/low-stock', { params: { threshold: 5 } });
+            setLowStockProducts(lowStockRes.data.products ?? []);
         } catch (error) {
             console.error(error);
             alert('Failed to load data');
         } finally {
             setLoading(false);
         }
-    };
+    }, [page]);
+
+    useEffect(() => {
+        fetchData(page);
+    }, [fetchData, page]);
 
     const handleDelete = async (id: string) => {
         if (!confirm('Are you sure you want to delete this product?')) return;
@@ -96,7 +104,7 @@ export default function ProductsPage() {
             price: product.price.toString(),
             oldPrice: product.oldPrice ? product.oldPrice.toString() : '',
             stock: product.stock.toString(),
-            description: '', // Ideally fetch description if missing in list view, assuming list has it
+            description: product.description ?? '',
             category: typeof product.category === 'object' ? product.category._id : product.category,
             isFeatured: product.isFeatured || false,
             variants: product.variants?.map(v => ({
@@ -147,10 +155,11 @@ export default function ProductsPage() {
                 await api.put(`/products/${editingId}`, payload);
             } else {
                 await api.post('/products', payload);
+                setPage(1);
             }
 
             // Refresh & Close
-            await fetchData();
+            await fetchData(editingId ? page : 1);
             setIsModalOpen(false);
             resetForm();
         } catch (error: unknown) {
@@ -195,6 +204,33 @@ export default function ProductsPage() {
                     <Plus size={20} /> Add Product
                 </button>
             </div>
+
+            {lowStockProducts.length > 0 && (
+                <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <div className="mb-3 flex items-center gap-2 text-amber-800">
+                        <AlertTriangle size={18} />
+                        <h3 className="font-bold">Low Stock Alert</h3>
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                        {lowStockProducts.slice(0, 6).map((product) => {
+                            const variantText = product.lowStockVariants && product.lowStockVariants.length > 0
+                                ? product.lowStockVariants.map(v => `${v.unit}: ${v.stock}`).join(', ')
+                                : `Stock: ${product.stock}`;
+                            return (
+                                <div key={product._id} className="rounded-lg bg-white px-3 py-2 text-sm shadow-sm">
+                                    <p className="font-semibold text-gray-800">{product.name}</p>
+                                    <p className="text-xs text-amber-700">{variantText}</p>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    {lowStockProducts.length > 6 && (
+                        <p className="mt-3 text-xs font-medium text-amber-700">
+                            {lowStockProducts.length - 6} more product(s) need attention.
+                        </p>
+                    )}
+                </div>
+            )}
 
             {loading ? (
                 <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>
@@ -256,6 +292,27 @@ export default function ProductsPage() {
                     </table>
                     {products.length === 0 && (
                         <div className="p-8 text-center text-gray-500">No products found. Add one above!</div>
+                    )}
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50 px-4 py-3 text-sm">
+                            <span className="text-gray-500">Page {page} of {totalPages}</span>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setPage((current) => Math.max(current - 1, 1))}
+                                    disabled={page <= 1}
+                                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 font-medium text-gray-600 disabled:opacity-50"
+                                >
+                                    Previous
+                                </button>
+                                <button
+                                    onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
+                                    disabled={page >= totalPages}
+                                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 font-medium text-gray-600 disabled:opacity-50"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
                     )}
                 </div>
             )}

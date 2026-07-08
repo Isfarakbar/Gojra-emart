@@ -560,7 +560,7 @@ class _LoginScreenState extends State<LoginScreen>
             child: Lottie.network(
               'https://assets7.lottiefiles.com/packages/lf20_2m1smtya.json',
               fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => _GroceryIllustration(),
+              errorBuilder: (context, error, stackTrace) => _GroceryIllustration(),
             ),
           ),
         ),
@@ -576,7 +576,7 @@ class _LoginScreenState extends State<LoginScreen>
                 borderRadius: BorderRadius.circular(22),
                 boxShadow: [
                   BoxShadow(
-                    color: _green.withOpacity(0.14),
+                    color: _green.withValues(alpha: 0.14),
                     blurRadius: 24,
                     offset: const Offset(0, 12),
                   ),
@@ -587,7 +587,7 @@ class _LoginScreenState extends State<LoginScreen>
                 child: Image.asset(
                   'assets/logo.png',
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
+                  errorBuilder: (context, error, stackTrace) => const Icon(
                     Icons.local_grocery_store_rounded,
                     color: _green,
                     size: 38,
@@ -998,7 +998,7 @@ class _LoginScreenState extends State<LoginScreen>
               width: 112,
               height: 112,
               decoration: BoxDecoration(
-                color: _green.withOpacity(0.1),
+                color: _green.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.check_circle_rounded,
@@ -1263,7 +1263,7 @@ class _GoogleButton extends StatelessWidget {
             Image.network(
               'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png',
               height: 22,
-              errorBuilder: (_, __, ___) => Text(
+              errorBuilder: (context, error, stackTrace) => Text(
                 'G',
                 style: GoogleFonts.poppins(
                   fontSize: 20,
@@ -1301,9 +1301,9 @@ class _InlineMessage extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.18)),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: Row(
         children: [
@@ -1334,7 +1334,7 @@ class _GroceryIllustration extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: _LoginScreenState._green.withOpacity(0.08),
+        color: _LoginScreenState._green.withValues(alpha: 0.08),
         shape: BoxShape.circle,
       ),
       child: Stack(

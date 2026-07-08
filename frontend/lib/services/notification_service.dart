@@ -1,5 +1,5 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'api_service.dart';
 
 class NotificationService {
@@ -17,7 +17,7 @@ class NotificationService {
     );
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      print('User granted permission for notifications');
+      debugPrint('User granted permission for notifications');
       
       // Get FCM token
       String? token = await _firebaseMessaging.getToken();
@@ -32,12 +32,12 @@ class NotificationService {
 
       // Handle foreground messages
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        print('Received foreground message: ${message.notification?.title}');
+        debugPrint('Received foreground message: ${message.notification?.title}');
         // You can use a local notification package here to show a snackbar or native popup
       });
       
     } else {
-      print('User declined or has not accepted permission');
+      debugPrint('User declined or has not accepted permission');
     }
   }
 
@@ -46,9 +46,9 @@ class NotificationService {
       await _apiService.dio.put('/users/fcm-token', data: {
         'fcmToken': token,
       });
-      print('FCM Token successfully registered with backend');
+      debugPrint('FCM Token successfully registered with backend');
     } catch (e) {
-      print('Failed to register FCM Token: $e');
+      debugPrint('Failed to register FCM Token: $e');
     }
   }
 }

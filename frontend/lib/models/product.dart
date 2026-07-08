@@ -60,4 +60,25 @@ class Product {
           [],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      '_id': id,
+      'name': name,
+      'description': description,
+      'price': price,
+      'imageUrl': imageUrl,
+      'stock': stock,
+      'oldPrice': oldPrice,
+      'isFeatured': isFeatured,
+      'variants': variants
+          .map((variant) => {
+                'unit': variant.unit,
+                'price': variant.price,
+                'stock': variant.stock,
+                'oldPrice': variant.oldPrice,
+              })
+          .toList(),
+    };
+  }
 }

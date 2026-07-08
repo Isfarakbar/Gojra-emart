@@ -1,13 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class HelpSupportScreen extends StatelessWidget {
   const HelpSupportScreen({super.key});
 
+  static const String _supportPhone = String.fromEnvironment('SUPPORT_PHONE');
+  static const String _supportEmail = String.fromEnvironment('SUPPORT_EMAIL');
+  static const String _supportWhatsapp = String.fromEnvironment('SUPPORT_WHATSAPP');
+
+  Future<void> _launchSupportUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -36,25 +46,25 @@ class HelpSupportScreen extends StatelessWidget {
              _buildContactOption(
                icon: Icons.headset_mic,
                title: "Customer Service",
-               subtitle: "+92 300 1234567",
+               subtitle: _supportPhone.isEmpty ? "Phone support not configured" : _supportPhone,
                color: Colors.blue,
-               onTap: () {}, // Can launch phone dialer
+               onTap: _supportPhone.isEmpty ? () {} : () => _launchSupportUrl('tel:$_supportPhone'),
              ),
              const SizedBox(height: 12),
              _buildContactOption(
                icon: Icons.email,
                title: "Email Support",
-               subtitle: "support@gojramart.com",
+               subtitle: _supportEmail.isEmpty ? "Email support not configured" : _supportEmail,
                color: Colors.orange,
-               onTap: () {}, // Can launch email client
+               onTap: _supportEmail.isEmpty ? () {} : () => _launchSupportUrl('mailto:$_supportEmail'),
              ),
              const SizedBox(height: 12),
              _buildContactOption(
                icon: Icons.chat,
                title: "WhatsApp",
-               subtitle: "Chat with us now",
+               subtitle: _supportWhatsapp.isEmpty ? "WhatsApp support not configured" : "Chat with us now",
                color: Colors.green,
-               onTap: () {}, // Can launch WhatsApp
+               onTap: _supportWhatsapp.isEmpty ? () {} : () => _launchSupportUrl('https://wa.me/$_supportWhatsapp'),
              ),
 
              const SizedBox(height: 32),
@@ -64,7 +74,7 @@ class HelpSupportScreen extends StatelessWidget {
              _buildExpansionTile("How do I track my order?", "You can track your order status in the 'My Orders' section of the app."),
              _buildExpansionTile("What payment methods do you accept?", "We currently accept Cash on Delivery (COD) only."),
              _buildExpansionTile("How can I return an item?", "Please contact our support team within 24 hours of delivery for returns."),
-             _buildExpansionTile("Do you deliver to my area?", "Currently, we only serve Gojra city and nearby areas."),
+             _buildExpansionTile("Do you deliver to my area?", "You can place orders from any location. Please enter your delivery address clearly and allow location access at checkout so we can capture accurate GPS coordinates."),
           ],
         ),
       ),
@@ -87,7 +97,7 @@ class HelpSupportScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color),

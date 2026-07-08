@@ -1,6 +1,5 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
 const { getAuth } = require('firebase-admin/auth');
@@ -35,15 +34,24 @@ const registerUser = async (req, res, next) => {
     const { name, email, password, phone, address } = req.body;
 
     try {
-        const userExists = await User.findOne({ email });
+        if (!name?.trim() || !email?.trim() || !password) {
+            return res.status(400).json({ message: 'Name, email, and password are required.' });
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json({ message: 'Password must be at least 6 characters.' });
+        }
+
+        const normalizedEmail = email.trim().toLowerCase();
+        const userExists = await User.findOne({ email: normalizedEmail });
 
         if (userExists) {
             return res.status(400).json({ message: 'User already exists' });
         }
 
         const user = await User.create({
-            name,
-            email,
+            name: name.trim(),
+            email: normalizedEmail,
             password,
             phone,
             address
@@ -76,7 +84,11 @@ const loginUser = async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        const user = await User.findOne({ email });
+        if (!email || !password) {
+            return res.status(400).json({ message: 'Email and password are required.' });
+        }
+
+        const user = await User.findOne({ email: email.trim().toLowerCase() });
 
         if (user && (await user.matchPassword(password))) {
             const token = generateToken(user._id);
@@ -109,8 +121,12 @@ const googleLogin = async (req, res) => {
         const decodedToken = await getAuth().verifyIdToken(token);
         const { name, email, uid: googleId } = decodedToken;
 
+        if (!email) {
+            return res.status(400).json({ message: 'Google account email is required.' });
+        }
+
         // Check if user exists
-        let user = await User.findOne({ email });
+        let user = await User.findOne({ email: email.toLowerCase() });
 
         if (user) {
             // User exists - update googleId if missing
@@ -122,9 +138,8 @@ const googleLogin = async (req, res) => {
             // New User - Create
             user = await User.create({
                 name: name || 'New User',
-                email,
+                email: email.toLowerCase(),
                 googleId,
-                password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10), // Random password
                 phone: '', // Can prompt user later
             });
         }
@@ -173,7 +188,6 @@ const firebasePhoneLogin = async (req, res) => {
             user = await User.create({
                 name: 'New User', // Default name, can be updated later
                 phone: phone_number,
-                password: uid, // Use Firebase UID as a placeholder password
             });
         }
 
@@ -182,6 +196,7 @@ const firebasePhoneLogin = async (req, res) => {
             name: user.name,
             email: user.email,
             phone: user.phone,
+            address: user.address,
             role: user.role,
             token: generateToken(user._id),
         });

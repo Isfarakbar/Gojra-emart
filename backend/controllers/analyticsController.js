@@ -14,7 +14,9 @@ const getDashboardStats = async (req, res) => {
 
         // 2. Total Revenue (Sum of all orders or valid orders)
         // Adjust match condition if you only want 'Paid' or 'Delivered' orders
+        const revenueMatch = { status: { $ne: 'Cancelled' } };
         const totalRevenueResult = await Order.aggregate([
+            { $match: revenueMatch },
             {
                 $group: {
                     _id: null,
@@ -31,6 +33,7 @@ const getDashboardStats = async (req, res) => {
         const salesOverTime = await Order.aggregate([
             {
                 $match: {
+                    ...revenueMatch,
                     createdAt: { $gte: sevenDaysAgo }
                 }
             },

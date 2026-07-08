@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:io' show Platform;
 import 'package:geolocator/geolocator.dart';
 
 class CartItem {
@@ -25,6 +24,15 @@ class CartItem {
   });
 }
 
+class PlaceOrderResult {
+  final Map<String, dynamic>? order;
+  final String? error;
+
+  const PlaceOrderResult({this.order, this.error});
+
+  bool get isSuccess => order != null && error == null;
+}
+
 class CartProvider with ChangeNotifier {
   final Map<String, CartItem> _items = {};
   final ApiService _apiService = ApiService();
@@ -41,19 +49,19 @@ class CartProvider with ChangeNotifier {
     return total;
   }
 
-  void addToCart(Map<String, dynamic> product, int quantity, {Map<String, dynamic>? selectedVariant}) {
+  void addToCart(Map<String, dynamic> product, int quantity,
+      {Map<String, dynamic>? selectedVariant}) {
     final productId = product['_id'] ?? product['id'];
-    // Use variant price if selected, otherwise product price
-    final price = selectedVariant != null 
-        ? (selectedVariant['price'] as num).toDouble() 
+    final price = selectedVariant != null
+        ? (selectedVariant['price'] as num).toDouble()
         : (product['price'] as num).toDouble();
-    
+
     final title = product['name'];
     final image = product['imageUrl'];
     final variantUnit = selectedVariant?['unit'];
 
-    // Unique key for cart item: ID + Variant
-    final cartKey = variantUnit != null ? '${productId}_$variantUnit' : productId;
+    final cartKey =
+        variantUnit != null ? '${productId}_$variantUnit' : productId;
 
     if (_items.containsKey(cartKey)) {
       _items.update(
@@ -86,8 +94,10 @@ class CartProvider with ChangeNotifier {
   }
 
   void addItem(String productId, double price, String title, String image) {
-      // Legacy wrapper or implementation
-      addToCart({'_id': productId, 'price': price, 'name': title, 'imageUrl': image}, 1);
+    addToCart(
+      {'_id': productId, 'price': price, 'name': title, 'imageUrl': image},
+      1,
+    );
   }
 
   void removeItem(String productId) {
@@ -101,15 +111,17 @@ class CartProvider with ChangeNotifier {
     }
     if (_items[productId]!.quantity > 1) {
       _items.update(
-          productId,
-          (existingCartItem) => CartItem(
-                id: existingCartItem.id,
-                title: existingCartItem.title,
-                quantity: existingCartItem.quantity - 1,
-                price: existingCartItem.price,
-                image: existingCartItem.image,
-                productId: existingCartItem.productId,
-              ));
+        productId,
+        (existingCartItem) => CartItem(
+          id: existingCartItem.id,
+          title: existingCartItem.title,
+          quantity: existingCartItem.quantity - 1,
+          price: existingCartItem.price,
+          image: existingCartItem.image,
+          productId: existingCartItem.productId,
+          variantUnit: existingCartItem.variantUnit,
+        ),
+      );
     } else {
       _items.remove(productId);
     }
@@ -121,43 +133,59 @@ class CartProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String?> placeOrder(String street, String area, String city, String phone, {String paymentMethod = 'COD'}) async {
-    final url = '/orders';
-    final orderItems = _items.values.map((cp) => {
-      'product': cp.productId,
-      'name': cp.title,
-      'qty': cp.quantity,
-      'image': cp.image,
-      'price': cp.price,
-      'variant': cp.variantUnit,
-    }).toList();
+  Future<Map<String, dynamic>?> _captureCurrentLocation() async {
+    if (kIsWeb) return null;
 
-    // Try to capture GPS location, but don't block the order if it fails
-    Map<String, dynamic>? locationData;
-    final isMobile = !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return null;
 
-    if (isMobile) {
-      try {
-        final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (serviceEnabled) {
-          LocationPermission permission = await Geolocator.checkPermission();
-          if (permission == LocationPermission.denied) {
-            permission = await Geolocator.requestPermission();
-          }
-
-          if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-            final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-            locationData = {
-              'latitude': position.latitude,
-              'longitude': position.longitude,
-            };
-          }
-        }
-      } catch (e) {
-        // GPS failed — proceed without location
-        print('Location capture failed: $e');
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
       }
+
+      if (permission != LocationPermission.whileInUse &&
+          permission != LocationPermission.always) {
+        return null;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      return {
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+      };
+    } catch (error) {
+      debugPrint('Location capture failed: $error');
+      return null;
     }
+  }
+
+  Future<PlaceOrderResult> placeOrder(
+    String street,
+    String area,
+    String city,
+    String phone, {
+    String paymentMethod = 'COD',
+  }) async {
+    final url = '/orders';
+    final orderItems = _items.values
+        .map((cp) => {
+              'product': cp.productId,
+              'name': cp.title,
+              'qty': cp.quantity,
+              'image': cp.image,
+              'price': cp.price,
+              'variant': cp.variantUnit,
+            })
+        .toList();
+
+    final locationData = await _captureCurrentLocation();
 
     try {
       final data = {
@@ -170,18 +198,21 @@ class CartProvider with ChangeNotifier {
         },
         'paymentMethod': paymentMethod,
         'totalPrice': totalAmount,
-        'location': locationData,
+        if (locationData != null) 'location': locationData,
       };
 
-      await _apiService.dio.post(url, data: data);
+      final response = await _apiService.dio.post(url, data: data);
+      final createdOrder = Map<String, dynamic>.from(response.data);
       clear();
-      return null; // Success
+      return PlaceOrderResult(order: createdOrder);
     } catch (error) {
-      print(error);
+      debugPrint(error.toString());
       if (error is DioException && error.response != null) {
-          return error.response?.data['message'] ?? 'An error occurred';
+        return PlaceOrderResult(
+          error: error.response?.data['message'] ?? 'An error occurred',
+        );
       }
-      return 'An error occurred';
+      return const PlaceOrderResult(error: 'An error occurred');
     }
   }
 }

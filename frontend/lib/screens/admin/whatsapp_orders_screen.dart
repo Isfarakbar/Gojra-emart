@@ -21,13 +21,14 @@ class _WhatsAppOrdersScreenState extends State<WhatsAppOrdersScreen> {
   Future<void> _fetchMessages() async {
     try {
       final response = await ApiService().dio.get('/webhook/orders');
+      if (!mounted) return;
       setState(() {
         _messages = response.data;
         _isLoading = false;
       });
     } catch (e) {
-      print(e);
-      setState(() => _isLoading = false);
+      debugPrint('Error fetching WhatsApp orders: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

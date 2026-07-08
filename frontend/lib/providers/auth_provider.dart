@@ -5,17 +5,35 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
   final _storage = const FlutterSecureStorage();
+  static const String _googleWebClientId = String.fromEnvironment(
+    'GOOGLE_WEB_CLIENT_ID',
+    defaultValue: '357186664125-bb22gkb81i3klrcl7jttc1sive0vake6.apps.googleusercontent.com',
+  );
   
   String? _token;
   Map<String, dynamic>? _user;
+  bool _notificationsInitialized = false;
 
   bool get isAuthenticated => _token != null;
   Map<String, dynamic>? get user => _user;
   String? get token => _token;
+  List<dynamic> get addresses => List<dynamic>.from(_user?['addresses'] ?? []);
+  Map<String, dynamic>? get defaultAddress {
+    for (final address in addresses) {
+      if (address is Map && address['isDefault'] == true) {
+        return Map<String, dynamic>.from(address);
+      }
+    }
+    if (addresses.isNotEmpty && addresses.first is Map) {
+      return Map<String, dynamic>.from(addresses.first);
+    }
+    return null;
+  }
   bool get needsProfileSetup {
     final name = (_user?['name'] ?? '').toString().trim();
     final address = (_user?['address'] ?? '').toString().trim();
@@ -26,7 +44,7 @@ class AuthProvider with ChangeNotifier {
   Future<String?> googleLogin() async {
     try {
       final signIn = GoogleSignIn.instance;
-      await signIn.initialize(serverClientId: '357186664125-bb22gkb81i3klrcl7jttc1sive0vake6.apps.googleusercontent.com');
+      await signIn.initialize(serverClientId: _googleWebClientId);
       final account = await signIn.authenticate();
       final googleIdToken = account.authentication.idToken;
 
@@ -54,6 +72,7 @@ class AuthProvider with ChangeNotifier {
           'photoUrl': account.photoUrl,
         };
         await _saveSession();
+        await _registerNotifications();
         notifyListeners();
         return null;
       }
@@ -81,6 +100,7 @@ class AuthProvider with ChangeNotifier {
         _token = response.data['token'];
         _user = response.data;
         await _saveSession();
+        await _registerNotifications();
         notifyListeners();
         return null; // No error
       }
@@ -108,6 +128,7 @@ class AuthProvider with ChangeNotifier {
         _token = response.data['token'];
         _user = response.data;
         await _saveSession();
+        await _registerNotifications();
         notifyListeners();
         return null; // No error
       }
@@ -162,6 +183,7 @@ class AuthProvider with ChangeNotifier {
   Future<void> logout() async {
     _user = null;
     _token = null;
+    _notificationsInitialized = false;
     await _storage.delete(key: 'token');
     await _storage.delete(key: 'user');
     notifyListeners();
@@ -231,6 +253,7 @@ class AuthProvider with ChangeNotifier {
         _token = _user!['token'];
         
         await _saveSession();
+        await _registerNotifications();
         
         notifyListeners();
         return null; // Success
@@ -260,11 +283,68 @@ class AuthProvider with ChangeNotifier {
         if (_user?['photoUrl'] != null) 'photoUrl': _user!['photoUrl'],
       };
       await _saveSession();
+      await _registerNotifications();
       notifyListeners();
       return true;
     } catch (_) {
       await logout();
       return false;
+    }
+  }
+
+  Future<String?> addAddress(Map<String, dynamic> address) async {
+    try {
+      final response = await _apiService.dio.post('/users/addresses', data: address);
+      _mergeAddressResponse(response.data);
+      await _saveSession();
+      notifyListeners();
+      return null;
+    } on DioException catch (e) {
+      return e.response?.data['message'] ?? 'Failed to save address.';
+    } catch (_) {
+      return 'Failed to save address.';
+    }
+  }
+
+  Future<String?> updateAddress(String id, Map<String, dynamic> address) async {
+    try {
+      final response = await _apiService.dio.put('/users/addresses/$id', data: address);
+      _mergeAddressResponse(response.data);
+      await _saveSession();
+      notifyListeners();
+      return null;
+    } on DioException catch (e) {
+      return e.response?.data['message'] ?? 'Failed to update address.';
+    } catch (_) {
+      return 'Failed to update address.';
+    }
+  }
+
+  Future<String?> deleteAddress(String id) async {
+    try {
+      final response = await _apiService.dio.delete('/users/addresses/$id');
+      _mergeAddressResponse(response.data);
+      await _saveSession();
+      notifyListeners();
+      return null;
+    } on DioException catch (e) {
+      return e.response?.data['message'] ?? 'Failed to delete address.';
+    } catch (_) {
+      return 'Failed to delete address.';
+    }
+  }
+
+  Future<String?> setDefaultAddress(String id) async {
+    try {
+      final response = await _apiService.dio.put('/users/addresses/$id/default');
+      _mergeAddressResponse(response.data);
+      await _saveSession();
+      notifyListeners();
+      return null;
+    } on DioException catch (e) {
+      return e.response?.data['message'] ?? 'Failed to update address.';
+    } catch (_) {
+      return 'Failed to update address.';
     }
   }
 
@@ -274,6 +354,26 @@ class AuthProvider with ChangeNotifier {
     }
     if (_user != null) {
       await _storage.write(key: 'user', value: jsonEncode(_user));
+    }
+  }
+
+  void _mergeAddressResponse(dynamic data) {
+    if (_user == null || data is! Map) return;
+    _user = {
+      ..._user!,
+      if (data['address'] != null) 'address': data['address'],
+      if (data['addresses'] != null) 'addresses': data['addresses'],
+    };
+  }
+
+  Future<void> _registerNotifications() async {
+    if (_notificationsInitialized || _token == null) return;
+
+    try {
+      await NotificationService(_apiService).initialize();
+      _notificationsInitialized = true;
+    } catch (error) {
+      debugPrint('Notification setup failed: $error');
     }
   }
 }

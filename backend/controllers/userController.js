@@ -2,6 +2,26 @@ const User = require('../models/User');
 const Product = require('../models/Product');
 const USER_PAGE_SIZE = 20;
 
+const normalizeAddressPayload = (body) => ({
+    label: (body.label || 'Home').trim(),
+    street: (body.street || '').trim(),
+    area: (body.area || '').trim(),
+    city: (body.city || '').trim(),
+    phone: (body.phone || '').trim(),
+    isDefault: Boolean(body.isDefault),
+});
+
+const validateAddressPayload = (address) => {
+    return address.street && address.area && address.city && address.phone;
+};
+
+const syncDefaultAddressString = (user) => {
+    const defaultAddress = user.addresses.find(address => address.isDefault) || user.addresses[0];
+    if (defaultAddress) {
+        user.address = `${defaultAddress.street}, ${defaultAddress.area}, ${defaultAddress.city}`;
+    }
+};
+
 // @desc    Get user profile (including wishlist)
 // @route   GET /api/users/profile
 // @access  Private
@@ -45,6 +65,7 @@ const updateUserProfile = async (req, res) => {
                 email: updatedUser.email,
                 phone: updatedUser.phone,
                 address: updatedUser.address,
+                addresses: updatedUser.addresses,
                 wishlist: updatedUser.wishlist,
                 role: updatedUser.role,
                 token: req.token // Preserve token if needed, or client handles it
@@ -52,6 +73,114 @@ const updateUserProfile = async (req, res) => {
         } else {
             res.status(404).json({ message: 'User not found' });
         }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Add user address
+// @route   POST /api/users/addresses
+// @access  Private
+const addAddress = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        const address = normalizeAddressPayload(req.body);
+        if (!validateAddressPayload(address)) {
+            return res.status(400).json({ message: 'Street, area, city, and phone are required.' });
+        }
+
+        if (address.isDefault || user.addresses.length === 0) {
+            user.addresses.forEach(existing => { existing.isDefault = false; });
+            address.isDefault = true;
+        }
+
+        user.addresses.push(address);
+        syncDefaultAddressString(user);
+        await user.save();
+
+        res.status(201).json({ addresses: user.addresses, address: user.address });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Update user address
+// @route   PUT /api/users/addresses/:addressId
+// @access  Private
+const updateAddress = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        const address = user.addresses.id(req.params.addressId);
+        if (!address) return res.status(404).json({ message: 'Address not found' });
+
+        const payload = normalizeAddressPayload({ ...address.toObject(), ...req.body });
+        if (!validateAddressPayload(payload)) {
+            return res.status(400).json({ message: 'Street, area, city, and phone are required.' });
+        }
+
+        if (payload.isDefault) {
+            user.addresses.forEach(existing => { existing.isDefault = false; });
+        }
+
+        address.set(payload);
+        if (!user.addresses.some(existing => existing.isDefault)) {
+            address.isDefault = true;
+        }
+        syncDefaultAddressString(user);
+        await user.save();
+
+        res.json({ addresses: user.addresses, address: user.address });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Delete user address
+// @route   DELETE /api/users/addresses/:addressId
+// @access  Private
+const deleteAddress = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        const address = user.addresses.id(req.params.addressId);
+        if (!address) return res.status(404).json({ message: 'Address not found' });
+
+        const wasDefault = address.isDefault;
+        address.deleteOne();
+        if (wasDefault && user.addresses.length > 0) {
+            user.addresses[0].isDefault = true;
+        }
+        syncDefaultAddressString(user);
+        await user.save();
+
+        res.json({ addresses: user.addresses, address: user.address });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Set default user address
+// @route   PUT /api/users/addresses/:addressId/default
+// @access  Private
+const setDefaultAddress = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        const address = user.addresses.id(req.params.addressId);
+        if (!address) return res.status(404).json({ message: 'Address not found' });
+
+        user.addresses.forEach(existing => { existing.isDefault = false; });
+        address.isDefault = true;
+        syncDefaultAddressString(user);
+        await user.save();
+
+        res.json({ addresses: user.addresses, address: user.address });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -125,5 +254,15 @@ const updateFCMToken = async (req, res) => {
     }
 };
 
-module.exports = { getUserProfile, updateUserProfile, toggleWishlist, getAllUsers, updateFCMToken };
+module.exports = {
+    getUserProfile,
+    updateUserProfile,
+    toggleWishlist,
+    getAllUsers,
+    updateFCMToken,
+    addAddress,
+    updateAddress,
+    deleteAddress,
+    setDefaultAddress
+};
 

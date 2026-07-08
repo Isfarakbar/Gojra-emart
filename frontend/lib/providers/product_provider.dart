@@ -18,11 +18,20 @@ class ProductProvider with ChangeNotifier {
     _errorMessage = null; // Reset error
     notifyListeners();
     try {
-      final response = await _apiService.dio.get('/products');
-      _products = response.data is Map ? response.data['products'] ?? [] : response.data;
+      final response = await _apiService.dio.get('/products', queryParameters: {'page': 1});
+      final firstPageProducts = response.data is Map ? response.data['products'] ?? [] : response.data;
+      final totalPages = response.data is Map ? response.data['pages'] ?? 1 : 1;
+      final allProducts = List<dynamic>.from(firstPageProducts);
+
+      for (var page = 2; page <= totalPages; page++) {
+        final pageResponse = await _apiService.dio.get('/products', queryParameters: {'page': page});
+        allProducts.addAll(pageResponse.data is Map ? pageResponse.data['products'] ?? [] : pageResponse.data);
+      }
+
+      _products = allProducts;
     } catch (e) {
       _errorMessage = "Failed to load products. Check connection.";
-      print("Error fetching products: $e");
+      debugPrint("Error fetching products: $e");
     }
     _isLoading = false;
     notifyListeners();
@@ -34,7 +43,7 @@ class ProductProvider with ChangeNotifier {
       _categories = response.data;
       notifyListeners();
     } catch (e) {
-      print("Error fetching categories: $e");
+      debugPrint("Error fetching categories: $e");
     }
   }
 
@@ -45,7 +54,7 @@ class ProductProvider with ChangeNotifier {
       searchProducts(_searchQuery); // Refresh filter
       notifyListeners();
     } catch (e) {
-      print("Error deleting product: $e");
+      debugPrint("Error deleting product: $e");
     }
   }
 
@@ -96,10 +105,10 @@ class ProductProvider with ChangeNotifier {
       _isSearching = true;
       notifyListeners();
       try {
-          final response = await _apiService.dio.get('/products?keyword=$query');
+          final response = await _apiService.dio.get('/products', queryParameters: {'keyword': query});
           _searchResults = response.data is Map ? response.data['products'] ?? [] : response.data;
       } catch (e) {
-          print("Error searching products: $e");
+          debugPrint("Error searching products: $e");
       }
       _isSearching = false;
       notifyListeners();
@@ -110,12 +119,12 @@ class ProductProvider with ChangeNotifier {
       return [];
     }
     try {
-      final response = await _apiService.dio.get('/products/search?q=$query');
+      final response = await _apiService.dio.get('/products/search', queryParameters: {'q': query});
       if (response.data is List) {
         return List<Map<String, dynamic>>.from(response.data);
       }
     } catch (e) {
-      print("Error fetching suggestions: $e");
+      debugPrint("Error fetching suggestions: $e");
     }
     return [];
   }
@@ -127,7 +136,7 @@ class ProductProvider with ChangeNotifier {
         return Map<String, dynamic>.from(response.data);
       }
     } catch (e) {
-      print("Error fetching product by id: $e");
+      debugPrint("Error fetching product by id: $e");
     }
     return null;
   }

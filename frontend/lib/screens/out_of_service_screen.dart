@@ -34,7 +34,7 @@ class OutOfServiceScreen extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               const Text(
-                "We currently only serve Gojra City. \nIt seems you are outside our service area.",
+                "We could not read your current location. Please enable location access and try again.",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,

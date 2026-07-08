@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:lottie/lottie.dart';
-import 'main_screen.dart';
 import 'splash_screen.dart';
 
 class LocationRequestScreen extends StatefulWidget {
@@ -49,7 +48,7 @@ class _LocationRequestScreenState extends State<LocationRequestScreen> {
         if (permission == LocationPermission.denied) {
            setState(() {
               _isLoading = false;
-              _errorMessage = "Permission denied. We need location to find nearby stores.";
+              _errorMessage = "Permission denied. We need location access to capture accurate delivery coordinates.";
             });
           return;
         }
@@ -123,7 +122,7 @@ class _LocationRequestScreenState extends State<LocationRequestScreen> {
               const SizedBox(height: 10),
               
               const Text(
-                "We need your location to show products and offers available in your area.",
+                "We use your location only to capture accurate GPS coordinates for delivery.",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,

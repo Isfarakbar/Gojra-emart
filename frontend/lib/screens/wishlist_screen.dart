@@ -14,7 +14,7 @@ class WishlistScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: Text("My Wishlist", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.black)),
         centerTitle: true,
@@ -38,21 +38,8 @@ class WishlistScreen extends StatelessWidget {
                   crossAxisCount: 2, childAspectRatio: 0.7, crossAxisSpacing: 12, mainAxisSpacing: 12),
               itemCount: wishlistProvider.wishlist.length,
               itemBuilder: (context, index) {
-                // Determine if we need to convert Product object to map or if ProductCard handles objects
-                // Our ProductCard expects Map<String, dynamic> but WishlistProvider returns List<Product>.
-                // We should update ProductCard or convert properly.
-                // Let's quickly check ProductCard definition.
-                // It takes Map<String, dynamic>. 
-                // So we format the product model back to map.
                 final product = wishlistProvider.wishlist[index];
-                return ProductCard(product: {
-                    '_id': product.id,
-                    'name': product.name,
-                    'price': product.price,
-                    'description': product.description,
-                    'imageUrl': product.imageUrl,
-                    'stock': product.stock, // Assumed available
-                });
+                return ProductCard(product: product.toJson());
               },
             ),
     );

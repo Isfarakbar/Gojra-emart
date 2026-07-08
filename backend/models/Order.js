@@ -19,12 +19,14 @@ const orderSchema = new mongoose.Schema({
         phone: { type: String, required: true },
     },
     paymentMethod: { type: String, required: true, default: 'COD' },
+    itemsPrice: { type: Number, required: true, default: 0.0 },
+    deliveryFee: { type: Number, required: true, default: 0.0 },
     totalPrice: { type: Number, required: true, default: 0.0 },
     status: { type: String, required: true, default: 'Placed', enum: ['Placed', 'Confirmed', 'Packing', 'Out for Delivery', 'Delivered', 'Cancelled'] },
     source: { type: String, default: 'App' }, // App or WhatsApp (if parsed)
     location: {
-        latitude: { type: Number },
-        longitude: { type: Number }
+        latitude: { type: Number, min: -90, max: 90 },
+        longitude: { type: Number, min: -180, max: 180 }
     }
 }, { timestamps: true });
 

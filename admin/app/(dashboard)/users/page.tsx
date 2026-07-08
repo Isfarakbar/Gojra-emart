@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { Loader2, Users, Search, Mail, Phone, Shield, User as UserIcon, Calendar } from 'lucide-react';
 
@@ -19,22 +19,27 @@ export default function UsersPage() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [filter, setFilter] = useState<'all' | 'user' | 'admin'>('all');
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalUsers, setTotalUsers] = useState(0);
 
-    useEffect(() => {
-        fetchUsers();
-    }, []);
-
-    const fetchUsers = async () => {
+    const fetchUsers = useCallback(async (targetPage = page) => {
         try {
-            const { data } = await api.get('/users');
+            const { data } = await api.get('/users', { params: { page: targetPage } });
             setUsers(data.users ?? data);
+            setTotalPages(data.pages ?? 1);
+            setTotalUsers(data.total ?? (data.users ?? data).length);
         } catch (error) {
             console.error(error);
             alert('Failed to fetch users');
         } finally {
             setLoading(false);
         }
-    };
+    }, [page]);
+
+    useEffect(() => {
+        fetchUsers(page);
+    }, [fetchUsers, page]);
 
     const filteredUsers = users.filter(user => {
         const matchSearch =
@@ -58,7 +63,7 @@ export default function UsersPage() {
                 <div className="flex gap-4">
                     <div className="bg-white px-4 py-3 rounded-xl border border-gray-100 shadow-sm text-center">
                         <p className="text-2xl font-bold text-gray-800">{users.length}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">Total Users</p>
+                        <p className="text-xs text-gray-500 mt-0.5">This Page</p>
                     </div>
                     <div className="bg-white px-4 py-3 rounded-xl border border-gray-100 shadow-sm text-center">
                         <p className="text-2xl font-bold text-purple-600">{adminCount}</p>
@@ -199,8 +204,27 @@ export default function UsersPage() {
 
                     {/* Table Footer */}
                     {filteredUsers.length > 0 && (
-                        <div className="p-4 border-t border-gray-100 bg-gray-50/50 text-xs text-gray-400 text-right">
-                            Showing {filteredUsers.length} of {users.length} users
+                        <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50/50 p-4 text-xs text-gray-400">
+                            <span>Showing {filteredUsers.length} of {users.length} users on this page. Total users: {totalUsers}</span>
+                            {totalPages > 1 && (
+                                <div className="flex items-center gap-2 text-sm">
+                                    <button
+                                        onClick={() => setPage((current) => Math.max(current - 1, 1))}
+                                        disabled={page <= 1}
+                                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 font-medium text-gray-600 disabled:opacity-50"
+                                    >
+                                        Previous
+                                    </button>
+                                    <span className="text-gray-500">Page {page} of {totalPages}</span>
+                                    <button
+                                        onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
+                                        disabled={page >= totalPages}
+                                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 font-medium text-gray-600 disabled:opacity-50"
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

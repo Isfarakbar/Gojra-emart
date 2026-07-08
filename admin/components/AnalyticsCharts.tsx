@@ -8,13 +8,13 @@ interface AnalyticsProps {
     statusData: StatusDataPoint[];
 }
 
-interface SalesDataPoint {
+interface SalesDataPoint extends Record<string, string | number> {
     date: string;
     revenue: number;
     orders: number;
 }
 
-interface StatusDataPoint {
+interface StatusDataPoint extends Record<string, string | number> {
     name: string;
     value: number;
 }
@@ -22,9 +22,6 @@ interface StatusDataPoint {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function AnalyticsCharts({ salesData, statusData }: AnalyticsProps) {
-    // If no sales data (e.g., fresh install), mock empty to avoid crash
-    // or just show empty state
-
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Sales Trend */}

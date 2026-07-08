@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, ShoppingBag, LogOut, User, Layers, Users } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, LogOut, User, Layers, Users, Settings, BarChart3 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function Sidebar() {
@@ -14,7 +14,9 @@ export default function Sidebar() {
         { href: '/products', label: 'Products', icon: Package },
         { href: '/categories', label: 'Categories', icon: Layers },
         { href: '/orders', label: 'Orders', icon: ShoppingBag },
+        { href: '/reports', label: 'Reports', icon: BarChart3 },
         { href: '/users', label: 'Users', icon: Users },
+        { href: '/settings/store', label: 'Store Settings', icon: Settings },
         { href: '/settings/home', label: 'Home Layout', icon: LayoutDashboard },
     ];
 

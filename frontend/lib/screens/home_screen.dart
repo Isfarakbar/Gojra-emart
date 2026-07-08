@@ -7,7 +7,6 @@ import '../providers/home_provider.dart';
 import '../widgets/skeleton_loader.dart';
 import '../widgets/product_card.dart';
 import '../providers/wishlist_provider.dart';
-import 'search_screen.dart';
 import '../widgets/live_search_bar.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -128,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                    image: NetworkImage(banner.imageUrl),
                                    fit: BoxFit.cover,
                                  ),
-                                 boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 6))],
+                                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 6))],
                                ),
                                child: Container(
                                  decoration: BoxDecoration(
@@ -136,7 +135,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                    gradient: LinearGradient(
                                      begin: Alignment.topCenter,
                                      end: Alignment.bottomCenter,
-                                     colors: [Colors.transparent, Colors.black.withOpacity(0.7)]
+                                      colors: [Colors.transparent, Colors.black.withValues(alpha: 0.7)]
                                    )
                                  ),
                                  padding: const EdgeInsets.all(24),
@@ -147,7 +146,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                      if(banner.title.isNotEmpty)
                                      Text(banner.title, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20, height: 1.1)),
                                      if(banner.subtitle.isNotEmpty)
-                                     Text(banner.subtitle, style: GoogleFonts.inter(color: Colors.white.withOpacity(0.9), fontSize: 13)),
+                                      Text(banner.subtitle, style: GoogleFonts.inter(color: Colors.white.withValues(alpha: 0.9), fontSize: 13)),
                                    ],
                                  ),
                                ),
@@ -348,7 +347,7 @@ class _HomeScreenState extends State<HomeScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16), // Smaller squircle
-                boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))],
+                boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))],
                 image: imageUrl != null && imageUrl.isNotEmpty 
                     ? DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover)
                     : null,

@@ -30,7 +30,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
-      print(e);
+      debugPrint('Error fetching notifications: $e');
     }
   }
 
@@ -45,7 +45,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         }
       });
     } catch (e) {
-      print(e);
+      debugPrint('Error marking notification as read: $e');
     }
   }
 
@@ -94,17 +94,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     child: Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       decoration: BoxDecoration(
-                        color: isRead ? Colors.white : Colors.blue.withOpacity(0.05),
+                        color: isRead ? Colors.white : Colors.blue.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: isRead ? Colors.transparent : Colors.blue.withOpacity(0.1)),
-                        boxShadow: isRead ? [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 5)] : [],
+                        border: Border.all(color: isRead ? Colors.transparent : Colors.blue.withValues(alpha: 0.1)),
+                        boxShadow: isRead ? [BoxShadow(color: Colors.grey.withValues(alpha: 0.05), blurRadius: 5)] : [],
                       ),
                       child: ListTile(
                         contentPadding: const EdgeInsets.all(16),
                         leading: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.primary.withOpacity(0.1),
+                            color: theme.colorScheme.primary.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(Icons.notifications, color: theme.colorScheme.primary),

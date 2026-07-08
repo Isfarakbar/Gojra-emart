@@ -71,7 +71,7 @@ class CategoryListSkeleton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
         itemCount: 5,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        separatorBuilder: (context, index) => const SizedBox(width: 12),
         itemBuilder: (context, index) => const SkeletonLoader(height: 40, width: 100, borderRadius: 20),
       ),
     );

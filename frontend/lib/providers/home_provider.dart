@@ -27,7 +27,7 @@ class HomeProvider with ChangeNotifier {
       _sections = sectionsData.map((e) => HomeSection.fromJson(e)).toList();
       
     } catch (e) {
-      print("Error fetching home layout: $e");
+      debugPrint("Error fetching home layout: $e");
     } finally {
       _isLoading = false;
       notifyListeners();

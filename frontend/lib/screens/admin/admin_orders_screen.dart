@@ -21,13 +21,14 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   Future<void> _fetchOrders() async {
     try {
       final response = await ApiService().dio.get('/orders');
+      if (!mounted) return;
       setState(() {
         _orders = response.data is Map ? response.data['orders'] ?? [] : response.data;
         _isLoading = false;
       });
     } catch (e) {
-      print(e);
-      setState(() => _isLoading = false);
+      debugPrint('Error fetching admin orders: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -36,7 +37,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       await ApiService().dio.put('/orders/$id/status', data: {'status': status});
       _fetchOrders();
     } catch (e) {
-      print(e);
+      debugPrint('Error updating order status: $e');
     }
   }
 
