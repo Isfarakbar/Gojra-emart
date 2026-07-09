@@ -30,6 +30,7 @@ const getCashReport = async (req, res) => {
                 $group: {
                     _id: null,
                     grossSales: { $sum: '$itemsPrice' },
+                    discounts: { $sum: '$discountAmount' },
                     deliveryFees: { $sum: '$deliveryFee' },
                     totalCash: { $sum: '$totalPrice' },
                     orderCount: { $sum: 1 },
@@ -58,6 +59,7 @@ const getCashReport = async (req, res) => {
             range: { start, end },
             summary: summary || {
                 grossSales: 0,
+                discounts: 0,
                 deliveryFees: 0,
                 totalCash: 0,
                 orderCount: 0,

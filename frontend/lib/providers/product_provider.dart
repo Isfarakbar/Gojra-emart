@@ -59,7 +59,9 @@ class ProductProvider with ChangeNotifier {
   }
 
   List<dynamic> _filteredProducts = [];
-  List<dynamic> get filteredProducts => _filteredProducts.isEmpty && _searchQuery.isEmpty ? _products : _filteredProducts;
+  bool _hasActiveFilter = false;
+  List<dynamic> get filteredProducts => _hasActiveFilter ? _filteredProducts : _products;
+  bool get hasActiveFilter => _hasActiveFilter;
   
   String _searchQuery = "";
 
@@ -72,7 +74,9 @@ class ProductProvider with ChangeNotifier {
     _searchQuery = query;
     if (query.isEmpty) {
       _filteredProducts = [];
+      _hasActiveFilter = false;
     } else {
+      _hasActiveFilter = true;
       _filteredProducts = _products.where((product) {
         final name = product['name'].toString().toLowerCase();
         final searchLower = query.toLowerCase();
@@ -85,12 +89,19 @@ class ProductProvider with ChangeNotifier {
   void filterByCategory(String category) {
     if (category == "All") {
       _filteredProducts = _products;
+      _hasActiveFilter = false;
     } else {
+      _hasActiveFilter = true;
       _filteredProducts = _products.where((product) {
-         final cat = product['category'].toString().toLowerCase();
-         final target = category.toLowerCase();
-         final name = product['name'].toString().toLowerCase();
-         return cat.contains(target) || name.contains(target);
+         final productCategory = product['category'];
+         final target = category.toLowerCase().trim();
+         final categoryName = productCategory is Map
+             ? (productCategory['name'] ?? '').toString().toLowerCase()
+             : productCategory.toString().toLowerCase();
+         final categoryId = productCategory is Map
+             ? (productCategory['_id'] ?? '').toString().toLowerCase()
+             : productCategory.toString().toLowerCase();
+         return categoryName == target || categoryId == target;
       }).toList();
     }
     notifyListeners();

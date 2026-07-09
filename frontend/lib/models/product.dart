@@ -16,7 +16,9 @@ class ProductVariant {
       unit: json['unit'],
       price: (json['price'] as num).toDouble(),
       stock: json['stock'] ?? 0,
-      oldPrice: json['oldPrice'] != null ? (json['oldPrice'] as num).toDouble() : null,
+      oldPrice: json['oldPrice'] != null
+          ? (json['oldPrice'] as num).toDouble()
+          : null,
     );
   }
 }
@@ -30,6 +32,8 @@ class Product {
   final int stock;
   final double? oldPrice;
   final bool isFeatured;
+  final double rating;
+  final int reviewCount;
   final List<ProductVariant> variants;
 
   Product({
@@ -41,6 +45,8 @@ class Product {
     required this.stock,
     this.oldPrice,
     this.isFeatured = false,
+    this.rating = 0,
+    this.reviewCount = 0,
     this.variants = const [],
   });
 
@@ -52,9 +58,14 @@ class Product {
       price: (json['price'] as num).toDouble(),
       imageUrl: json['imageUrl'] ?? '',
       stock: json['stock'] ?? 0,
-      oldPrice: json['oldPrice'] != null ? (json['oldPrice'] as num).toDouble() : null,
+      oldPrice: json['oldPrice'] != null
+          ? (json['oldPrice'] as num).toDouble()
+          : null,
       isFeatured: json['isFeatured'] ?? false,
-      variants: (json['variants'] as List<dynamic>?)
+      rating: (json['rating'] as num?)?.toDouble() ?? 0,
+      reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
+      variants:
+          (json['variants'] as List<dynamic>?)
               ?.map((v) => ProductVariant.fromJson(v))
               .toList() ??
           [],
@@ -71,13 +82,17 @@ class Product {
       'stock': stock,
       'oldPrice': oldPrice,
       'isFeatured': isFeatured,
+      'rating': rating,
+      'reviewCount': reviewCount,
       'variants': variants
-          .map((variant) => {
-                'unit': variant.unit,
-                'price': variant.price,
-                'stock': variant.stock,
-                'oldPrice': variant.oldPrice,
-              })
+          .map(
+            (variant) => {
+              'unit': variant.unit,
+              'price': variant.price,
+              'stock': variant.stock,
+              'oldPrice': variant.oldPrice,
+            },
+          )
           .toList(),
     };
   }

@@ -15,6 +15,14 @@ const protect = async (req, res, next) => {
             if (!req.user) {
                 return res.status(401).json({ message: 'Not authorized, user not found' });
             }
+            if (req.user.accountStatus === 'Suspended') {
+                return res.status(403).json({
+                    code: 'ACCOUNT_SUSPENDED',
+                    message: req.user.suspendedReason
+                        ? `Your account is suspended: ${req.user.suspendedReason}`
+                        : 'Your account has been suspended. Please contact support.',
+                });
+            }
             next();
         } catch (error) {
             console.error('Auth Failed:', error);

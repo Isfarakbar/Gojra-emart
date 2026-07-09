@@ -9,13 +9,19 @@ const {
     addAddress,
     updateAddress,
     deleteAddress,
-    setDefaultAddress
+    setDefaultAddress,
+    updateAccountStatus
 } = require('../controllers/userController');
 const { protect, admin } = require('../middleware/authMiddleware');
+const { validateObjectIdParam } = require('../middleware/validateObjectId');
+
+router.param('id', validateObjectIdParam('user ID'));
+router.param('addressId', validateObjectIdParam('address ID'));
 
 // Admin - Get all users
 router.route('/')
     .get(protect, admin, getAllUsers);
+router.put('/:id/status', protect, admin, updateAccountStatus);
 
 // User profile
 router.route('/profile')

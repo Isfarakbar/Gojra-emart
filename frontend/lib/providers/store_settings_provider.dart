@@ -11,6 +11,10 @@ class StoreSettingsProvider with ChangeNotifier {
   double _deliveryFee = 0;
   double _freeDeliveryAbove = 0;
   int _estimatedDeliveryMinutes = 45;
+  bool _enableDeliverySlots = true;
+  int _deliveryDaysAhead = 7;
+  int _minimumSlotLeadMinutes = 60;
+  List<Map<String, dynamic>> _deliverySlots = [];
   String _supportPhone = '';
   String _supportEmail = '';
   String _supportWhatsapp = '';
@@ -22,6 +26,14 @@ class StoreSettingsProvider with ChangeNotifier {
   double get deliveryFee => _deliveryFee;
   double get freeDeliveryAbove => _freeDeliveryAbove;
   int get estimatedDeliveryMinutes => _estimatedDeliveryMinutes;
+  bool get enableDeliverySlots => _enableDeliverySlots;
+  int get deliveryDaysAhead => _deliveryDaysAhead;
+  int get minimumSlotLeadMinutes => _minimumSlotLeadMinutes;
+  List<Map<String, dynamic>> get deliverySlots =>
+      List.unmodifiable(_deliverySlots);
+  List<Map<String, dynamic>> get activeDeliverySlots => _deliverySlots
+      .where((slot) => slot['isActive'] != false)
+      .toList(growable: false);
   String get supportPhone => _supportPhone;
   String get supportEmail => _supportEmail;
   String get supportWhatsapp => _supportWhatsapp;
@@ -50,7 +62,17 @@ class StoreSettingsProvider with ChangeNotifier {
       _minimumOrderAmount = _toDouble(data['minimumOrderAmount']);
       _deliveryFee = _toDouble(data['deliveryFee']);
       _freeDeliveryAbove = _toDouble(data['freeDeliveryAbove']);
-      _estimatedDeliveryMinutes = (data['estimatedDeliveryMinutes'] as num?)?.toInt() ?? 45;
+      _estimatedDeliveryMinutes =
+          (data['estimatedDeliveryMinutes'] as num?)?.toInt() ?? 45;
+      _enableDeliverySlots = data['enableDeliverySlots'] ?? true;
+      _deliveryDaysAhead =
+          (data['deliveryDaysAhead'] as num?)?.toInt().clamp(1, 30) ?? 7;
+      _minimumSlotLeadMinutes =
+          (data['minimumSlotLeadMinutes'] as num?)?.toInt().clamp(0, 1440) ??
+          60;
+      _deliverySlots = (data['deliverySlots'] as List? ?? [])
+          .map((slot) => Map<String, dynamic>.from(slot))
+          .toList();
       _supportPhone = data['supportPhone'] ?? '';
       _supportEmail = data['supportEmail'] ?? '';
       _supportWhatsapp = data['supportWhatsapp'] ?? '';

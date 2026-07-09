@@ -27,7 +27,9 @@ app.use(cors({
         if (allowedOrigins.includes(origin)) {
             return callback(null, true);
         }
-        return callback(new Error('Not allowed by CORS'));
+        const error = new Error('Origin is not allowed by CORS');
+        error.status = 403;
+        return callback(error);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -73,6 +75,11 @@ const analyticsRoutes = require('./routes/analyticsRoutes');
 const layoutRoutes = require('./routes/layoutRoutes');
 const storeSettingsRoutes = require('./routes/storeSettingsRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const promoCodeRoutes = require('./routes/promoCodeRoutes');
+const supportTicketRoutes = require('./routes/supportTicketRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
+const inventoryRoutes = require('./routes/inventoryRoutes');
+const riderRoutes = require('./routes/riderRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
@@ -87,6 +94,11 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/layout', layoutRoutes);
 app.use('/api/settings', storeSettingsRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/promos', promoCodeRoutes);
+app.use('/api/support', supportTicketRoutes);
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/riders', riderRoutes);
 
 // Health check
 app.get('/', (req, res) => {

@@ -9,7 +9,12 @@ import '../screens/product_detail_screen.dart';
 import '../screens/search_screen.dart';
 
 class LiveSearchBar extends StatefulWidget {
-  const LiveSearchBar({super.key});
+  final String placeholder;
+
+  const LiveSearchBar({
+    super.key,
+    this.placeholder = 'Search groceries, vegetables...',
+  });
 
   @override
   State<LiveSearchBar> createState() => _LiveSearchBarState();
@@ -147,6 +152,7 @@ class _LiveSearchBarState extends State<LiveSearchBar> with SingleTickerProvider
   }
 
   void _onSubmitted(String query) {
+    if (query.trim().isEmpty) return;
     _hideOverlay();
     _focusNode.unfocus();
     Navigator.of(context).push(
@@ -381,11 +387,12 @@ class _LiveSearchBarState extends State<LiveSearchBar> with SingleTickerProvider
         animation: _focusNode,
         builder: (context, child) {
           final isFocused = _focusNode.hasFocus;
-          return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
+          return SizedBox(
+            height: 52,
+            child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: isFocused ? const Color(0xFF2E7D32) : Colors.transparent,
                 width: 1.5,
@@ -401,8 +408,8 @@ class _LiveSearchBarState extends State<LiveSearchBar> with SingleTickerProvider
             child: Row(
               children: [
                 const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Icon(Icons.search, color: Colors.grey, size: 20),
+                  padding: EdgeInsets.only(left: 14, right: 10),
+                  child: Icon(Icons.search_rounded, color: Color(0xFF7B8190), size: 22),
                 ),
                 Expanded(
                   child: TextField(
@@ -411,11 +418,16 @@ class _LiveSearchBarState extends State<LiveSearchBar> with SingleTickerProvider
                     onChanged: _onSearchChanged,
                     onSubmitted: _onSubmitted,
                     textInputAction: TextInputAction.search,
-                    decoration: const InputDecoration(
-                      hintText: "Search groceries, vegetables...",
+                    decoration: InputDecoration(
+                      hintText: widget.placeholder,
                       border: InputBorder.none,
                       isDense: true,
-                      contentPadding: EdgeInsets.symmetric(vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 15),
+                      hintStyle: GoogleFonts.poppins(
+                        color: const Color(0xFF8A90A0),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     style: GoogleFonts.poppins(
                       fontSize: 14,
@@ -425,7 +437,9 @@ class _LiveSearchBarState extends State<LiveSearchBar> with SingleTickerProvider
                 ),
                 if (_controller.text.isNotEmpty)
                   IconButton(
-                    icon: const Icon(Icons.clear, color: Colors.grey, size: 18),
+                    tooltip: 'Clear',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.close_rounded, color: Color(0xFF8A90A0), size: 18),
                     onPressed: () {
                       setState(() {
                         _controller.clear();
@@ -434,7 +448,25 @@ class _LiveSearchBarState extends State<LiveSearchBar> with SingleTickerProvider
                       _hideOverlay();
                     },
                   ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: IconButton(
+                      tooltip: 'Search',
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF6F00),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                      onPressed: () => _onSubmitted(_controller.text),
+                    ),
+                  ),
+                ),
               ],
+            ),
             ),
           );
         },

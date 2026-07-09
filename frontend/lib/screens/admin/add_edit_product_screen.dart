@@ -39,7 +39,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
 
   Future<void> _fetchCategories() async {
     try {
-      final response = await ApiService().dio.get('/categories');
+      final response = await ApiService().dio.get('/categories/admin');
       if (!mounted) return;
       setState(() {
         _categories = response.data is List ? response.data : [];

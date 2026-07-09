@@ -12,9 +12,21 @@ interface StoreSettings {
     deliveryFee: number;
     freeDeliveryAbove: number;
     estimatedDeliveryMinutes: number;
+    enableDeliverySlots: boolean;
+    deliveryDaysAhead: number;
+    minimumSlotLeadMinutes: number;
+    deliverySlots: DeliverySlot[];
     supportPhone: string;
     supportEmail: string;
     supportWhatsapp: string;
+}
+
+interface DeliverySlot {
+    label: string;
+    startTime: string;
+    endTime: string;
+    isActive: boolean;
+    orderLimit: number;
 }
 
 const defaultSettings: StoreSettings = {
@@ -25,6 +37,14 @@ const defaultSettings: StoreSettings = {
     deliveryFee: 0,
     freeDeliveryAbove: 0,
     estimatedDeliveryMinutes: 45,
+    enableDeliverySlots: true,
+    deliveryDaysAhead: 7,
+    minimumSlotLeadMinutes: 60,
+    deliverySlots: [
+        { label: 'Morning', startTime: '09:00', endTime: '12:00', isActive: true, orderLimit: 0 },
+        { label: 'Afternoon', startTime: '12:00', endTime: '15:00', isActive: true, orderLimit: 0 },
+        { label: 'Evening', startTime: '15:00', endTime: '18:00', isActive: true, orderLimit: 0 },
+    ],
     supportPhone: '',
     supportEmail: '',
     supportWhatsapp: '',
@@ -56,6 +76,32 @@ export default function StoreSettingsPage() {
         setSettings(current => ({ ...current, [field]: value }));
     };
 
+    const updateSlot = (index: number, field: keyof DeliverySlot, value: string | number | boolean) => {
+        setSettings(current => ({
+            ...current,
+            deliverySlots: current.deliverySlots.map((slot, slotIndex) => (
+                slotIndex === index ? { ...slot, [field]: value } : slot
+            )),
+        }));
+    };
+
+    const addSlot = () => {
+        setSettings(current => ({
+            ...current,
+            deliverySlots: [
+                ...current.deliverySlots,
+                { label: 'New Slot', startTime: '18:00', endTime: '21:00', isActive: true, orderLimit: 0 },
+            ],
+        }));
+    };
+
+    const removeSlot = (index: number) => {
+        setSettings(current => ({
+            ...current,
+            deliverySlots: current.deliverySlots.filter((_, slotIndex) => slotIndex !== index),
+        }));
+    };
+
     const saveSettings = async (event: React.FormEvent) => {
         event.preventDefault();
         setSaving(true);
@@ -68,6 +114,15 @@ export default function StoreSettingsPage() {
                 deliveryFee: Number(settings.deliveryFee) || 0,
                 freeDeliveryAbove: Number(settings.freeDeliveryAbove) || 0,
                 estimatedDeliveryMinutes: Number(settings.estimatedDeliveryMinutes) || 45,
+                deliveryDaysAhead: Math.min(Math.max(Number(settings.deliveryDaysAhead) || 1, 1), 30),
+                minimumSlotLeadMinutes: Math.min(Math.max(Number(settings.minimumSlotLeadMinutes) || 0, 0), 1440),
+                deliverySlots: settings.deliverySlots.map(slot => ({
+                    ...slot,
+                    label: slot.label.trim(),
+                    startTime: slot.startTime,
+                    endTime: slot.endTime,
+                    orderLimit: Number(slot.orderLimit) || 0,
+                })),
             };
             const { data } = await api.put('/settings/store', payload);
             setSettings({ ...defaultSettings, ...data });
@@ -161,6 +216,76 @@ export default function StoreSettingsPage() {
                     <NumberField label="Free Delivery Above (Rs)" value={settings.freeDeliveryAbove} onChange={value => updateField('freeDeliveryAbove', value)} />
                     <NumberField label="ETA Minutes" value={settings.estimatedDeliveryMinutes} onChange={value => updateField('estimatedDeliveryMinutes', value)} />
                 </div>
+
+                <div className="mt-6 rounded-xl border border-gray-100 bg-gray-50 p-4">
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p className="text-sm font-bold text-gray-800">Delivery Slots</p>
+                            <p className="text-xs text-gray-500">Customers choose one of these slots during checkout.</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => updateField('enableDeliverySlots', !settings.enableDeliverySlots)}
+                                className={`h-7 w-12 rounded-full p-1 transition ${settings.enableDeliverySlots ? 'bg-green-500' : 'bg-gray-300'}`}
+                            >
+                                <span className={`block h-5 w-5 rounded-full bg-white transition ${settings.enableDeliverySlots ? 'translate-x-5' : 'translate-x-0'}`} />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={addSlot}
+                                className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-blue-600 shadow-sm ring-1 ring-gray-200 hover:bg-blue-50"
+                            >
+                                Add Slot
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <NumberField
+                            label="Book Up To (Days)"
+                            value={settings.deliveryDaysAhead}
+                            onChange={value => updateField('deliveryDaysAhead', value)}
+                        />
+                        <NumberField
+                            label="Preparation Lead Time (Minutes)"
+                            value={settings.minimumSlotLeadMinutes}
+                            onChange={value => updateField('minimumSlotLeadMinutes', value)}
+                        />
+                    </div>
+
+                    <div className="space-y-3">
+                        {settings.deliverySlots.map((slot, index) => (
+                            <div key={index} className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-white p-3 md:grid-cols-[1.2fr_1fr_1fr_0.8fr_auto_auto]">
+                                <TextField label="Label" value={slot.label} onChange={value => updateSlot(index, 'label', value)} />
+                                <TextField label="Start" type="time" value={slot.startTime} onChange={value => updateSlot(index, 'startTime', value)} />
+                                <TextField label="End" type="time" value={slot.endTime} onChange={value => updateSlot(index, 'endTime', value)} />
+                                <NumberField label="Limit" value={slot.orderLimit} onChange={value => updateSlot(index, 'orderLimit', value)} />
+                                <label className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 md:self-end">
+                                    <span>Active</span>
+                                    <input
+                                        type="checkbox"
+                                        checked={slot.isActive}
+                                        onChange={event => updateSlot(index, 'isActive', event.target.checked)}
+                                        className="h-4 w-4 accent-blue-600"
+                                    />
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => removeSlot(index)}
+                                    className="rounded-lg border border-red-100 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 md:self-end"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        ))}
+                        {settings.deliverySlots.length === 0 && (
+                            <div className="rounded-lg border border-dashed border-gray-300 bg-white p-5 text-center text-sm text-gray-500">
+                                No delivery slots configured.
+                            </div>
+                        )}
+                    </div>
+                </div>
             </section>
 
             <section className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
@@ -194,11 +319,12 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
     );
 }
 
-function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function TextField({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
     return (
         <label className="space-y-1.5">
             <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">{label}</span>
             <input
+                type={type}
                 value={value}
                 onChange={event => onChange(event.target.value)}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"

@@ -5,16 +5,19 @@ const productSchema = new mongoose.Schema({
     description: { type: String },
     price: { type: Number, required: true },
     oldPrice: { type: Number }, // For discount display (e.g. was 200, now 150)
-    stock: { type: Number, required: true, default: 0 },
+    stock: { type: Number, required: true, default: 0, min: 0 },
+    lowStockThreshold: { type: Number, default: 5, min: 0 },
     category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },
     imageUrl: { type: String, required: true },
     isFeatured: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
+    rating: { type: Number, default: 0, min: 0, max: 5 },
+    reviewCount: { type: Number, default: 0, min: 0 },
     variants: [
         {
             unit: { type: String, required: true }, // e.g., '500g', '1kg'
             price: { type: Number, required: true },
-            stock: { type: Number, default: 0 },
+            stock: { type: Number, default: 0, min: 0 },
             oldPrice: { type: Number }
         }
     ]

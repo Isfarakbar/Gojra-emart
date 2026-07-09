@@ -23,8 +23,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     try {
       final response = await ApiService().dio.get('/notifications');
       if (mounted) {
+        final data = response.data;
         setState(() {
-          _notifications = response.data;
+          _notifications = data is List ? data : (data['notifications'] ?? []);
           _isLoading = false;
         });
       }

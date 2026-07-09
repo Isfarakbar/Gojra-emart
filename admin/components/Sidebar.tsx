@@ -2,18 +2,30 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, ShoppingBag, LogOut, User, Layers, Users, Settings, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, LogOut, User, Layers, Users, Settings, BarChart3, BadgePercent, Bell, MessageSquare, Star, Warehouse, Bike } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
-export default function Sidebar() {
+export default function Sidebar({
+    isOpen = false,
+    onClose,
+}: {
+    isOpen?: boolean;
+    onClose?: () => void;
+}) {
     const pathname = usePathname();
     const { logout, user } = useAuth();
 
     const links = [
         { href: '/', label: 'Dashboard', icon: LayoutDashboard },
         { href: '/products', label: 'Products', icon: Package },
+        { href: '/inventory', label: 'Inventory', icon: Warehouse },
         { href: '/categories', label: 'Categories', icon: Layers },
         { href: '/orders', label: 'Orders', icon: ShoppingBag },
+        { href: '/riders', label: 'Riders', icon: Bike },
+        { href: '/promos', label: 'Promo Codes', icon: BadgePercent },
+        { href: '/notifications', label: 'Notifications', icon: Bell },
+        { href: '/support', label: 'Support', icon: MessageSquare },
+        { href: '/reviews', label: 'Reviews', icon: Star },
         { href: '/reports', label: 'Reports', icon: BarChart3 },
         { href: '/users', label: 'Users', icon: Users },
         { href: '/settings/store', label: 'Store Settings', icon: Settings },
@@ -21,7 +33,7 @@ export default function Sidebar() {
     ];
 
     return (
-        <aside className="w-64 bg-slate-900 text-white min-h-screen flex flex-col fixed left-0 top-0 overflow-y-auto">
+        <aside className={`z-50 flex min-h-screen w-64 flex-col overflow-y-auto bg-slate-900 text-white fixed left-0 top-0 transition-transform duration-200 md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
             <div className="p-6 border-b border-slate-800">
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
                     Gojra E-Mart
@@ -37,6 +49,7 @@ export default function Sidebar() {
                         <Link
                             key={link.href}
                             href={link.href}
+                            onClick={onClose}
                             className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
                                 ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' // Active state
                                 : 'text-slate-400 hover:bg-slate-800 hover:text-white'

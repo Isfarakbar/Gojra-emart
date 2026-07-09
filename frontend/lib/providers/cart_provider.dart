@@ -49,8 +49,11 @@ class CartProvider with ChangeNotifier {
     return total;
   }
 
-  void addToCart(Map<String, dynamic> product, int quantity,
-      {Map<String, dynamic>? selectedVariant}) {
+  void addToCart(
+    Map<String, dynamic> product,
+    int quantity, {
+    Map<String, dynamic>? selectedVariant,
+  }) {
     final productId = product['_id'] ?? product['id'];
     final price = selectedVariant != null
         ? (selectedVariant['price'] as num).toDouble()
@@ -60,8 +63,9 @@ class CartProvider with ChangeNotifier {
     final image = product['imageUrl'];
     final variantUnit = selectedVariant?['unit'];
 
-    final cartKey =
-        variantUnit != null ? '${productId}_$variantUnit' : productId;
+    final cartKey = variantUnit != null
+        ? '${productId}_$variantUnit'
+        : productId;
 
     if (_items.containsKey(cartKey)) {
       _items.update(
@@ -94,10 +98,12 @@ class CartProvider with ChangeNotifier {
   }
 
   void addItem(String productId, double price, String title, String image) {
-    addToCart(
-      {'_id': productId, 'price': price, 'name': title, 'imageUrl': image},
-      1,
-    );
+    addToCart({
+      '_id': productId,
+      'price': price,
+      'name': title,
+      'imageUrl': image,
+    }, 1);
   }
 
   void removeItem(String productId) {
@@ -133,6 +139,48 @@ class CartProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  int replaceWithReorderItems(List<dynamic> reorderItems) {
+    _items.clear();
+    var imported = 0;
+
+    for (final entry in reorderItems) {
+      if (entry is! Map || entry['product'] is! Map) continue;
+      final product = Map<String, dynamic>.from(entry['product']);
+      final selectedVariant = entry['selectedVariant'] is Map
+          ? Map<String, dynamic>.from(entry['selectedVariant'])
+          : null;
+      final requestedQuantity = (entry['quantity'] as num?)?.toInt() ?? 0;
+      final stock =
+          ((selectedVariant?['stock'] ?? product['stock'] ?? 0) as num).toInt();
+      final quantity = requestedQuantity.clamp(0, stock);
+      if (quantity < 1) continue;
+
+      final productId = (product['_id'] ?? product['id']).toString();
+      final variantUnit = selectedVariant?['unit']?.toString();
+      final price = (selectedVariant?['price'] ?? product['price'] as num)
+          .toDouble();
+      final cartKey = variantUnit == null
+          ? productId
+          : '${productId}_$variantUnit';
+
+      _items[cartKey] = CartItem(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        title: variantUnit == null
+            ? product['name'].toString()
+            : '${product['name']} ($variantUnit)',
+        quantity: quantity,
+        price: price,
+        image: (product['imageUrl'] ?? '').toString(),
+        productId: productId,
+        variantUnit: variantUnit,
+      );
+      imported++;
+    }
+
+    notifyListeners();
+    return imported;
+  }
+
   Future<Map<String, dynamic>?> _captureCurrentLocation() async {
     if (kIsWeb) return null;
 
@@ -156,10 +204,7 @@ class CartProvider with ChangeNotifier {
         ),
       );
 
-      return {
-        'latitude': position.latitude,
-        'longitude': position.longitude,
-      };
+      return {'latitude': position.latitude, 'longitude': position.longitude};
     } catch (error) {
       debugPrint('Location capture failed: $error');
       return null;
@@ -172,17 +217,22 @@ class CartProvider with ChangeNotifier {
     String city,
     String phone, {
     String paymentMethod = 'COD',
+    String? promoCode,
+    Map<String, dynamic>? deliverySlot,
+    String? deliveryDate,
   }) async {
     final url = '/orders';
     final orderItems = _items.values
-        .map((cp) => {
-              'product': cp.productId,
-              'name': cp.title,
-              'qty': cp.quantity,
-              'image': cp.image,
-              'price': cp.price,
-              'variant': cp.variantUnit,
-            })
+        .map(
+          (cp) => {
+            'product': cp.productId,
+            'name': cp.title,
+            'qty': cp.quantity,
+            'image': cp.image,
+            'price': cp.price,
+            'variant': cp.variantUnit,
+          },
+        )
         .toList();
 
     final locationData = await _captureCurrentLocation();
@@ -198,6 +248,10 @@ class CartProvider with ChangeNotifier {
         },
         'paymentMethod': paymentMethod,
         'totalPrice': totalAmount,
+        if (promoCode != null && promoCode.trim().isNotEmpty)
+          'promoCode': promoCode.trim(),
+        if (deliverySlot != null) 'deliverySlot': deliverySlot,
+        if (deliveryDate != null) 'deliveryDate': deliveryDate,
         if (locationData != null) 'location': locationData,
       };
 

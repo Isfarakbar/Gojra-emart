@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Product = require('../models/Product');
+const Order = require('../models/Order');
 const USER_PAGE_SIZE = 20;
 
 const normalizeAddressPayload = (body) => ({
@@ -223,14 +224,95 @@ const toggleWishlist = async (req, res) => {
 const getAllUsers = async (req, res) => {
     try {
         const page = Math.max(Number(req.query.page) || 1, 1);
-        const users = await User.find({})
+        const search = String(req.query.search || '').trim();
+        const role = ['user', 'admin'].includes(req.query.role) ? req.query.role : null;
+        const status = ['Active', 'Suspended'].includes(req.query.status) ? req.query.status : null;
+        const filter = {};
+
+        if (role) filter.role = role;
+        if (status) filter.accountStatus = status;
+        if (search) {
+            const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            filter.$or = [
+                { name: { $regex: escaped, $options: 'i' } },
+                { email: { $regex: escaped, $options: 'i' } },
+                { phone: { $regex: escaped, $options: 'i' } },
+            ];
+        }
+
+        const users = await User.find(filter)
             .select('-password -wishlist')
             .sort({ createdAt: -1 })
             .skip((page - 1) * USER_PAGE_SIZE)
-            .limit(USER_PAGE_SIZE);
-        const total = await User.countDocuments();
+            .limit(USER_PAGE_SIZE)
+            .lean();
+        const total = await User.countDocuments(filter);
 
-        res.json({ users, page, limit: USER_PAGE_SIZE, total, pages: Math.ceil(total / USER_PAGE_SIZE) });
+        const userIds = users.map(user => user._id);
+        const orderStats = await Order.aggregate([
+            { $match: { user: { $in: userIds } } },
+            {
+                $group: {
+                    _id: '$user',
+                    totalOrders: { $sum: 1 },
+                    deliveredOrders: {
+                        $sum: { $cond: [{ $eq: ['$status', 'Delivered'] }, 1, 0] },
+                    },
+                    totalSpent: {
+                        $sum: { $cond: [{ $eq: ['$status', 'Delivered'] }, '$totalPrice', 0] },
+                    },
+                    lastOrderAt: { $max: '$createdAt' },
+                },
+            },
+        ]);
+        const statsByUser = new Map(orderStats.map(item => [item._id.toString(), item]));
+        const usersWithStats = users.map(user => ({
+            ...user,
+            orderStats: statsByUser.get(user._id.toString()) || {
+                totalOrders: 0,
+                deliveredOrders: 0,
+                totalSpent: 0,
+                lastOrderAt: null,
+            },
+        }));
+
+        res.json({ users: usersWithStats, page, limit: USER_PAGE_SIZE, total, pages: Math.ceil(total / USER_PAGE_SIZE) });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+const updateAccountStatus = async (req, res) => {
+    try {
+        const { status, reason } = req.body;
+        if (!['Active', 'Suspended'].includes(status)) {
+            return res.status(400).json({ message: 'Status must be Active or Suspended.' });
+        }
+
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ message: 'User not found.' });
+        if (user.role === 'admin') {
+            return res.status(403).json({ message: 'Admin accounts cannot be suspended here.' });
+        }
+        if (status === 'Suspended' && !String(reason || '').trim()) {
+            return res.status(400).json({ message: 'A suspension reason is required.' });
+        }
+
+        user.accountStatus = status;
+        user.suspendedReason = status === 'Suspended' ? String(reason).trim().slice(0, 300) : '';
+        user.suspendedAt = status === 'Suspended' ? new Date() : undefined;
+        if (status === 'Suspended') user.fcmToken = null;
+        await user.save();
+
+        res.json({
+            message: status === 'Suspended' ? 'Customer suspended.' : 'Customer reactivated.',
+            user: {
+                _id: user._id,
+                accountStatus: user.accountStatus,
+                suspendedReason: user.suspendedReason,
+                suspendedAt: user.suspendedAt,
+            },
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -263,6 +345,7 @@ module.exports = {
     addAddress,
     updateAddress,
     deleteAddress,
-    setDefaultAddress
+    setDefaultAddress,
+    updateAccountStatus
 };
 

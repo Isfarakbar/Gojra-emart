@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { AlertTriangle, Plus, Trash2, Edit, Loader2, UploadCloud } from 'lucide-react';
+import { AlertTriangle, Plus, Trash2, Edit, Loader2, UploadCloud, Eye, EyeOff } from 'lucide-react';
 import Image from 'next/image';
+import ProductImage from '@/components/ProductImage';
 
 interface Product {
     _id: string;
@@ -12,6 +13,7 @@ interface Product {
     price: number;
     oldPrice?: number;
     isFeatured?: boolean;
+    isActive?: boolean;
     stock: number;
     category: { _id: string; name: string } | string;
     imageUrl: string;
@@ -32,6 +34,7 @@ interface ProductPayload {
     description: string;
     category: string;
     isFeatured: boolean;
+    isActive: boolean;
     variants: { unit: string; price: number; stock: number; oldPrice?: number }[];
     image?: string;
 }
@@ -57,6 +60,7 @@ export default function ProductsPage() {
         description: '',
         category: '',
         isFeatured: false,
+        isActive: true,
         variants: [] as { unit: string; price: string; stock: string; oldPrice: string }[],
     });
     const [imageFile, setImageFile] = useState<File | null>(null);
@@ -66,8 +70,8 @@ export default function ProductsPage() {
     const fetchData = useCallback(async (targetPage = page) => {
         try {
             const [prodRes, catRes] = await Promise.all([
-                api.get('/products', { params: { page: targetPage } }),
-                api.get('/categories')
+                api.get('/products/admin', { params: { page: targetPage } }),
+                api.get('/categories/admin')
             ]);
             setProducts(prodRes.data.products ?? prodRes.data);
             setTotalPages(prodRes.data.pages ?? 1);
@@ -107,6 +111,7 @@ export default function ProductsPage() {
             description: product.description ?? '',
             category: typeof product.category === 'object' ? product.category._id : product.category,
             isFeatured: product.isFeatured || false,
+            isActive: product.isActive !== false,
             variants: product.variants?.map(v => ({
                 unit: v.unit,
                 price: v.price.toString(),
@@ -171,7 +176,7 @@ export default function ProductsPage() {
     };
 
     const resetForm = () => {
-        setFormData({ name: '', price: '', oldPrice: '', stock: '', description: '', category: '', isFeatured: false, variants: [] });
+        setFormData({ name: '', price: '', oldPrice: '', stock: '', description: '', category: '', isFeatured: false, isActive: true, variants: [] });
         setImageFile(null);
         setImagePreview(null);
         setEditingId(null);
@@ -191,6 +196,18 @@ export default function ProductsPage() {
         const newVariants = [...formData.variants];
         newVariants[index][field] = value;
         setFormData({ ...formData, variants: newVariants });
+    };
+
+    const toggleProductVisibility = async (product: Product) => {
+        try {
+            const { data } = await api.put(`/products/${product._id}`, {
+                isActive: product.isActive === false,
+            });
+            setProducts(items => items.map(item => item._id === product._id ? data : item));
+        } catch (error) {
+            console.error(error);
+            alert('Failed to update product visibility');
+        }
     };
 
     return (
@@ -244,6 +261,7 @@ export default function ProductsPage() {
                                 <th className="p-4 font-medium">Category</th>
                                 <th className="p-4 font-medium">Price</th>
                                 <th className="p-4 font-medium">Stock</th>
+                                <th className="p-4 font-medium">Visibility</th>
                                 <th className="p-4 font-medium text-right">Actions</th>
                             </tr>
                         </thead>
@@ -254,14 +272,12 @@ export default function ProductsPage() {
                                 return (
                                     <tr key={product._id} className="hover:bg-gray-50/50">
                                         <td className="p-4">
-                                            <div className="w-10 h-10 relative rounded-md overflow-hidden bg-gray-100 border">
-                                                <Image
-                                                    src={product.imageUrl}
-                                                    alt={product.name}
-                                                    fill
-                                                    className="object-cover"
-                                                />
-                                            </div>
+                                            <ProductImage
+                                                src={product.imageUrl}
+                                                alt={product.name}
+                                                sizes="40px"
+                                                className="h-10 w-10 rounded-md border"
+                                            />
                                         </td>
                                         <td className="p-4 font-medium">{product.name}</td>
                                         <td className="p-4 text-gray-500">{catName}</td>
@@ -271,7 +287,19 @@ export default function ProductsPage() {
                                                 {product.stock > 0 ? `${product.stock} in stock` : 'Out of Stock'}
                                             </span>
                                         </td>
+                                        <td className="p-4">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${product.isActive === false ? 'bg-gray-100 text-gray-600' : 'bg-blue-100 text-blue-700'}`}>
+                                                {product.isActive === false ? 'Hidden' : 'Active'}
+                                            </span>
+                                        </td>
                                         <td className="p-4 text-right">
+                                            <button
+                                                onClick={() => toggleProductVisibility(product)}
+                                                className={`p-2 rounded-lg transition mr-1 ${product.isActive === false ? 'text-green-600 hover:bg-green-50' : 'text-gray-500 hover:bg-gray-50'}`}
+                                                title={product.isActive === false ? 'Show product' : 'Hide product'}
+                                            >
+                                                {product.isActive === false ? <Eye size={18} /> : <EyeOff size={18} />}
+                                            </button>
                                             <button
                                                 onClick={() => handleEdit(product)}
                                                 className="text-blue-500 hover:text-blue-700 p-2 hover:bg-blue-50 rounded-lg transition mr-1"
@@ -342,6 +370,7 @@ export default function ProductsPage() {
                                             src={imageFile ? URL.createObjectURL(imageFile) : imagePreview!}
                                             alt="Preview"
                                             fill
+                                            sizes="128px"
                                             className="object-cover"
                                         />
                                     ) : (
@@ -450,6 +479,16 @@ export default function ProductsPage() {
                                             onChange={e => setFormData({ ...formData, isFeatured: e.target.checked })}
                                         />
                                         <label htmlFor="featured" className="text-sm font-medium text-gray-700 cursor-pointer select-none">Mark as Featured Product</label>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            id="active"
+                                            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                                            checked={formData.isActive}
+                                            onChange={e => setFormData({ ...formData, isActive: e.target.checked })}
+                                        />
+                                        <label htmlFor="active" className="text-sm font-medium text-gray-700 cursor-pointer select-none">Visible in customer app</label>
                                     </div>
                                 </div>
                             </div>

@@ -1,5 +1,13 @@
 const Product = require('../models/Product');
+const InventoryMovement = require('../models/InventoryMovement');
 const PRODUCT_PAGE_SIZE = 20;
+
+const buildProductQuery = (req, includeInactive = false) => {
+    const keyword = req.query.keyword ? { $text: { $search: req.query.keyword } } : {};
+    const category = req.query.category ? { category: req.query.category } : {};
+    const active = includeInactive ? {} : { isActive: true };
+    return { ...keyword, ...category, ...active };
+};
 
 // @desc    Get all products
 // @route   GET /api/products
@@ -7,9 +15,7 @@ const PRODUCT_PAGE_SIZE = 20;
 const getProducts = async (req, res) => {
     try {
         const page = Math.max(Number(req.query.page) || 1, 1);
-        const keyword = req.query.keyword ? { $text: { $search: req.query.keyword } } : {};
-        const category = req.query.category ? { category: req.query.category } : {};
-        const query = { ...keyword, ...category };
+        const query = buildProductQuery(req);
 
         const products = await Product.find(query)
             .populate('category', 'name image')
@@ -44,7 +50,7 @@ const getProductById = async (req, res) => {
 // @route   POST /api/products
 // @access  Private/Admin
 const createProduct = async (req, res) => {
-    const { name, price, oldPrice, description, image, category, stock, variants, isFeatured } = req.body;
+    const { name, price, oldPrice, description, image, imageUrl, category, stock, variants, isFeatured } = req.body;
 
     try {
         const product = new Product({
@@ -52,7 +58,7 @@ const createProduct = async (req, res) => {
             price,
             oldPrice,
             description,
-            imageUrl: image,
+            imageUrl: image ?? imageUrl,
             category,
             stock,
             variants,
@@ -60,6 +66,33 @@ const createProduct = async (req, res) => {
         });
 
         const createdProduct = await product.save();
+        const initialMovements = [];
+        if (createdProduct.stock > 0) {
+            initialMovements.push({
+                product: createdProduct._id,
+                type: 'Restock',
+                quantityChange: createdProduct.stock,
+                previousStock: 0,
+                newStock: createdProduct.stock,
+                reason: 'Initial product stock',
+                performedBy: req.user._id,
+            });
+        }
+        for (const variant of createdProduct.variants || []) {
+            if (variant.stock > 0) {
+                initialMovements.push({
+                    product: createdProduct._id,
+                    variant: variant.unit,
+                    type: 'Restock',
+                    quantityChange: variant.stock,
+                    previousStock: 0,
+                    newStock: variant.stock,
+                    reason: 'Initial variant stock',
+                    performedBy: req.user._id,
+                });
+            }
+        }
+        if (initialMovements.length > 0) await InventoryMovement.insertMany(initialMovements);
         res.status(201).json(createdProduct);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -70,17 +103,21 @@ const createProduct = async (req, res) => {
 // @route   PUT /api/products/:id
 // @access  Private/Admin
 const updateProduct = async (req, res) => {
-    const { name, price, oldPrice, description, image, category, stock, variants, isFeatured, isActive } = req.body;
+    const { name, price, oldPrice, description, image, imageUrl, category, stock, variants, isFeatured, isActive } = req.body;
 
     try {
         const product = await Product.findById(req.params.id);
 
         if (product) {
+            const previousStock = product.stock;
+            const previousVariantStock = new Map(
+                (product.variants || []).map(variant => [variant.unit, variant.stock])
+            );
             product.name = name ?? product.name;
             product.price = price ?? product.price;
             product.oldPrice = oldPrice ?? product.oldPrice;
             product.description = description ?? product.description;
-            product.imageUrl = image ?? product.imageUrl;
+            product.imageUrl = image ?? imageUrl ?? product.imageUrl;
             product.category = category ?? product.category;
             product.stock = stock ?? product.stock;
             product.variants = variants ?? product.variants;
@@ -88,10 +125,59 @@ const updateProduct = async (req, res) => {
             product.isActive = isActive ?? product.isActive;
 
             const updatedProduct = await product.save();
+            const stockMovements = [];
+            if (updatedProduct.stock !== previousStock) {
+                stockMovements.push({
+                    product: updatedProduct._id,
+                    type: 'Correction',
+                    quantityChange: updatedProduct.stock - previousStock,
+                    previousStock,
+                    newStock: updatedProduct.stock,
+                    reason: 'Stock changed from product editor',
+                    performedBy: req.user._id,
+                });
+            }
+            for (const variant of updatedProduct.variants || []) {
+                const oldStock = previousVariantStock.get(variant.unit) ?? 0;
+                if (variant.stock !== oldStock) {
+                    stockMovements.push({
+                        product: updatedProduct._id,
+                        variant: variant.unit,
+                        type: 'Correction',
+                        quantityChange: variant.stock - oldStock,
+                        previousStock: oldStock,
+                        newStock: variant.stock,
+                        reason: 'Variant stock changed from product editor',
+                        performedBy: req.user._id,
+                    });
+                }
+            }
+            if (stockMovements.length > 0) await InventoryMovement.insertMany(stockMovements);
             res.json(updatedProduct);
         } else {
             res.status(404).json({ message: 'Product not found' });
         }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Get all products for admin, including hidden products
+// @route   GET /api/products/admin
+// @access  Private/Admin
+const getAdminProducts = async (req, res) => {
+    try {
+        const page = Math.max(Number(req.query.page) || 1, 1);
+        const query = buildProductQuery(req, true);
+
+        const products = await Product.find(query)
+            .populate('category', 'name image')
+            .sort(req.query.keyword ? { score: { $meta: 'textScore' } } : { createdAt: -1 })
+            .skip((page - 1) * PRODUCT_PAGE_SIZE)
+            .limit(PRODUCT_PAGE_SIZE);
+        const total = await Product.countDocuments(query);
+
+        res.json({ products, page, limit: PRODUCT_PAGE_SIZE, total, pages: Math.ceil(total / PRODUCT_PAGE_SIZE) });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -104,7 +190,7 @@ const deleteProduct = async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
 
-        if (product) {
+        if (product && product.isActive) {
             await product.deleteOne();
             res.json({ message: 'Product removed' });
         } else {
@@ -126,7 +212,7 @@ const searchProducts = async (req, res) => {
         }
 
         const products = await Product.find(
-            { $text: { $search: query } },
+            { $text: { $search: query }, isActive: true },
             { score: { $meta: 'textScore' } }
         )
         .sort({ score: { $meta: 'textScore' } })
@@ -184,6 +270,7 @@ const getLowStockProducts = async (req, res) => {
 
 module.exports = {
     getProducts,
+    getAdminProducts,
     getProductById,
     createProduct,
     updateProduct,

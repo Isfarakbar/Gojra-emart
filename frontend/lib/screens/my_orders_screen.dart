@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/skeleton_loader.dart';
 import '../utils/helpers.dart';
+import 'order_detail_screen.dart';
 
 class MyOrdersScreen extends StatefulWidget {
   const MyOrdersScreen({super.key});
@@ -16,13 +17,6 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
   List<dynamic> _orders = [];
   bool _isLoading = true;
   String? _cancellingOrderId;
-  static const List<String> _statusSteps = [
-    'Placed',
-    'Confirmed',
-    'Packing',
-    'Out for Delivery',
-    'Delivered',
-  ];
 
   @override
   void initState() {
@@ -54,12 +48,6 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
       case 'Cancelled': return Colors.red; // Red
       default: return Colors.grey;
     }
-  }
-
-  int _statusIndex(String status) {
-    if (status == 'Cancelled') return -1;
-    final index = _statusSteps.indexOf(status);
-    return index < 0 ? 0 : index;
   }
 
   bool _canCancel(String status) {
@@ -121,6 +109,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                     final order = _orders[i];
                     return Card(
                       margin: const EdgeInsets.only(bottom: 16),
+                      clipBehavior: Clip.antiAlias,
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: Column(
@@ -156,37 +145,52 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                                   ),
                                 ))),
                             const SizedBox(height: 10),
-                            _OrderTimeline(
-                              steps: _statusSteps,
-                              currentIndex: _statusIndex(order['status']),
-                              isCancelled: order['status'] == 'Cancelled',
-                              activeColor: _getStatusColor(order['status']),
-                            ),
-                            const SizedBox(height: 10),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text("Date: ${order['createdAt'].substring(0, 10)}", style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                                if (_canCancel(order['status']))
-                                  TextButton.icon(
-                                    onPressed: _cancellingOrderId == order['_id']
-                                        ? null
-                                        : () => _cancelOrder(order['_id']),
-                                    icon: _cancellingOrderId == order['_id']
-                                        ? const SizedBox(
-                                            width: 14,
-                                            height: 14,
-                                            child: CircularProgressIndicator(strokeWidth: 2),
-                                          )
-                                        : const Icon(Icons.cancel_outlined, size: 16),
-                                    label: const Text("Cancel Order"),
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: Colors.redAccent,
-                                      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)
-                                    ),
-                                  )
+                                TextButton.icon(
+                                  onPressed: () async {
+                                    await Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => OrderDetailScreen(
+                                          orderId: order['_id'],
+                                          initialOrder: Map<String, dynamic>.from(order),
+                                        ),
+                                      ),
+                                    );
+                                    if (mounted) _fetchMyOrders();
+                                  },
+                                  icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                                  label: const Text("View Details"),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: theme.colorScheme.primary,
+                                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                  ),
+                                )
                               ],
                             ),
+                            if (_canCancel(order['status']))
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton.icon(
+                                  onPressed: _cancellingOrderId == order['_id']
+                                      ? null
+                                      : () => _cancelOrder(order['_id']),
+                                  icon: _cancellingOrderId == order['_id']
+                                      ? const SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        )
+                                      : const Icon(Icons.cancel_outlined, size: 16),
+                                  label: const Text("Cancel Order"),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.redAccent,
+                                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -194,89 +198,6 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                   },
                 ),
               ),
-    );
-  }
-}
-
-class _OrderTimeline extends StatelessWidget {
-  final List<String> steps;
-  final int currentIndex;
-  final bool isCancelled;
-  final Color activeColor;
-
-  const _OrderTimeline({
-    required this.steps,
-    required this.currentIndex,
-    required this.isCancelled,
-    required this.activeColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (isCancelled) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.red.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.cancel_outlined, color: Colors.redAccent, size: 18),
-            SizedBox(width: 8),
-            Text(
-              'This order has been cancelled.',
-              style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      children: List.generate(steps.length, (index) {
-        final isDone = index <= currentIndex;
-        final isLast = index == steps.length - 1;
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Column(
-              children: [
-                Container(
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    color: isDone ? activeColor : Colors.grey.shade300,
-                    shape: BoxShape.circle,
-                  ),
-                  child: isDone
-                      ? const Icon(Icons.check, color: Colors.white, size: 14)
-                      : null,
-                ),
-                if (!isLast)
-                  Container(
-                    width: 2,
-                    height: 22,
-                    color: index < currentIndex ? activeColor : Colors.grey.shade300,
-                  ),
-              ],
-            ),
-            const SizedBox(width: 10),
-            Padding(
-              padding: const EdgeInsets.only(top: 1),
-              child: Text(
-                steps[index],
-                style: TextStyle(
-                  color: isDone ? Colors.black87 : Colors.grey,
-                  fontWeight: isDone ? FontWeight.w700 : FontWeight.w500,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ],
-        );
-      }),
     );
   }
 }

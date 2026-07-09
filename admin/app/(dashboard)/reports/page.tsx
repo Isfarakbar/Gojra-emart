@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { Banknote, Loader2, PackageCheck, ReceiptText, Truck, type LucideIcon } from 'lucide-react';
+import { BadgePercent, Banknote, Loader2, PackageCheck, ReceiptText, Truck, type LucideIcon } from 'lucide-react';
 
 interface ReportSummary {
     grossSales: number;
+    discounts: number;
     deliveryFees: number;
     totalCash: number;
     orderCount: number;
@@ -100,9 +101,10 @@ export default function ReportsPage() {
                 <div className="flex justify-center p-10"><Loader2 className="animate-spin text-blue-600" /></div>
             ) : (
                 <>
-                    <div className="grid gap-5 md:grid-cols-4">
+                    <div className="grid gap-5 md:grid-cols-5">
                         <ReportCard title="Total Cash" value={money(summary.totalCash)} icon={Banknote} color="green" />
                         <ReportCard title="Product Sales" value={money(summary.grossSales)} icon={ReceiptText} color="blue" />
+                        <ReportCard title="Discounts" value={money(summary.discounts)} icon={BadgePercent} color="red" />
                         <ReportCard title="Delivery Fees" value={money(summary.deliveryFees)} icon={Truck} color="orange" />
                         <ReportCard title="Orders" value={summary.orderCount.toString()} icon={PackageCheck} color="purple" />
                     </div>
@@ -167,13 +169,14 @@ function ReportCard({ title, value, icon: Icon, color }: {
     title: string;
     value: string;
     icon: LucideIcon;
-    color: 'green' | 'blue' | 'orange' | 'purple';
+    color: 'green' | 'blue' | 'orange' | 'purple' | 'red';
 }) {
     const colors = {
         green: 'bg-green-50 text-green-600',
         blue: 'bg-blue-50 text-blue-600',
         orange: 'bg-orange-50 text-orange-600',
         purple: 'bg-purple-50 text-purple-600',
+        red: 'bg-red-50 text-red-600',
     };
 
     return (

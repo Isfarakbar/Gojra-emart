@@ -4,6 +4,15 @@ const Notification = require('../models/Notification');
 const User = require('../models/User');
 const sendNotification = require('../utils/sendNotification');
 const { getOrCreateSettings } = require('./storeSettingsController');
+const { validatePromoForOrder } = require('./promoCodeController');
+const PromoCode = require('../models/PromoCode');
+const InventoryMovement = require('../models/InventoryMovement');
+const Rider = require('../models/Rider');
+const {
+    getKarachiClock,
+    validateDeliveryDate,
+    isStatusTransitionAllowed,
+} = require('../utils/orderRules');
 
 const ORDER_PAGE_SIZE = 20;
 const VALID_ORDER_STATUSES = ['Placed', 'Confirmed', 'Packing', 'Out for Delivery', 'Delivered', 'Cancelled'];
@@ -47,6 +56,53 @@ const restoreStock = async (items) => {
     }
 };
 
+const recordOrderInventoryMovements = async (items, orderId, type, performedBy) => {
+    try {
+        const movements = [];
+        for (const item of items) {
+            const product = await Product.findById(item.product).select('stock variants');
+            if (!product) continue;
+            const currentStock = item.variant
+                ? product.variants.find(variant => variant.unit === item.variant)?.stock
+                : product.stock;
+            if (currentStock === undefined) continue;
+
+            const isRestoration = type === 'Cancellation';
+            movements.push({
+                product: item.product,
+                variant: item.variant || '',
+                type,
+                quantityChange: isRestoration ? item.qty : -item.qty,
+                previousStock: isRestoration ? currentStock - item.qty : currentStock + item.qty,
+                newStock: currentStock,
+                reason: isRestoration
+                    ? `Stock restored from cancelled order #${orderId.toString().slice(-6).toUpperCase()}`
+                    : `Reserved for order #${orderId.toString().slice(-6).toUpperCase()}`,
+                order: orderId,
+                performedBy,
+            });
+        }
+        if (movements.length > 0) await InventoryMovement.insertMany(movements);
+    } catch (error) {
+        console.error('Inventory movement logging failed:', error.message);
+    }
+};
+
+const releaseRiderIfIdle = async (riderId, excludingOrderId) => {
+    if (!riderId) return;
+    const activeOrders = await Order.countDocuments({
+        _id: { $ne: excludingOrderId },
+        assignedRider: riderId,
+        status: { $in: ['Packing', 'Out for Delivery'] },
+    });
+    if (activeOrders === 0) {
+        await Rider.updateOne(
+            { _id: riderId, isActive: true },
+            { $set: { status: 'Available' } }
+        );
+    }
+};
+
 const sendOrderStatusNotification = async (order) => {
     if (order.user && order.user.fcmToken) {
         let notificationTitle = 'Order Update';
@@ -80,7 +136,7 @@ const sendOrderStatusNotification = async (order) => {
 // @access  Private
 const addOrderItems = async (req, res) => {
     try {
-        const { orderItems, shippingAddress, paymentMethod, location } = req.body;
+        const { orderItems, shippingAddress, paymentMethod, location, promoCode, deliverySlot, deliveryDate } = req.body;
 
         if (!orderItems || orderItems.length === 0) {
             return res.status(400).json({ message: 'No order items' });
@@ -97,6 +153,58 @@ const addOrderItems = async (req, res) => {
         const storeSettings = await getOrCreateSettings();
         if (!storeSettings.isStoreOpen) {
             return res.status(403).json({ message: storeSettings.closedMessage || 'Store is currently closed.' });
+        }
+
+        let selectedDeliverySlot = null;
+        let selectedDeliveryDate = null;
+        const activeSlots = (storeSettings.deliverySlots || []).filter(slot => slot.isActive);
+
+        if (storeSettings.enableDeliverySlots && activeSlots.length > 0) {
+            selectedDeliveryDate = validateDeliveryDate(deliveryDate, storeSettings.deliveryDaysAhead);
+            if (!selectedDeliveryDate) {
+                return res.status(400).json({
+                    message: `Please select a delivery date within the next ${storeSettings.deliveryDaysAhead || 7} days.`
+                });
+            }
+
+            const requestedLabel = String(deliverySlot?.label || '').trim();
+            const requestedStart = String(deliverySlot?.startTime || '').trim();
+            const requestedEnd = String(deliverySlot?.endTime || '').trim();
+
+            selectedDeliverySlot = activeSlots.find(slot =>
+                slot.label === requestedLabel &&
+                slot.startTime === requestedStart &&
+                slot.endTime === requestedEnd
+            );
+
+            if (!selectedDeliverySlot) {
+                return res.status(400).json({ message: 'Please select an available delivery slot.' });
+            }
+
+            const karachiNow = getKarachiClock();
+            const selectedStart = new Date(`${selectedDeliveryDate}T${selectedDeliverySlot.startTime}:00.000Z`);
+            const minimumStart = new Date(
+                karachiNow.getTime() + (Number(storeSettings.minimumSlotLeadMinutes) || 0) * 60 * 1000
+            );
+            if (selectedStart <= minimumStart) {
+                return res.status(400).json({
+                    message: 'This delivery slot is no longer available. Please choose a later time.'
+                });
+            }
+
+            if (selectedDeliverySlot.orderLimit > 0) {
+                const slotOrderCount = await Order.countDocuments({
+                    status: { $ne: 'Cancelled' },
+                    deliveryDate: selectedDeliveryDate,
+                    'deliverySlot.label': selectedDeliverySlot.label,
+                    'deliverySlot.startTime': selectedDeliverySlot.startTime,
+                    'deliverySlot.endTime': selectedDeliverySlot.endTime,
+                });
+
+                if (slotOrderCount >= selectedDeliverySlot.orderLimit) {
+                    return res.status(400).json({ message: 'This delivery slot is full. Please choose another slot.' });
+                }
+            }
         }
 
         // Store GPS coordinates when the app provides them. Do not restrict by distance.
@@ -177,7 +285,9 @@ const addOrderItems = async (req, res) => {
         const deliveryFee = storeSettings.freeDeliveryAbove > 0 && itemsPrice >= storeSettings.freeDeliveryAbove
             ? 0
             : storeSettings.deliveryFee;
-        const calculatedTotal = itemsPrice + deliveryFee;
+        const promoResult = await validatePromoForOrder(promoCode, itemsPrice);
+        const discountAmount = promoResult.discountAmount;
+        const calculatedTotal = Math.max(itemsPrice + deliveryFee - discountAmount, 0);
 
         await reserveStock(validatedItems);
 
@@ -188,13 +298,39 @@ const addOrderItems = async (req, res) => {
                 user: req.user._id,
                 shippingAddress,
                 paymentMethod: 'COD',
+                statusHistory: [{
+                    status: 'Placed',
+                    changedAt: new Date(),
+                    changedBy: req.user._id,
+                    note: 'Order placed by customer',
+                }],
+                deliveryDate: selectedDeliveryDate || undefined,
+                deliverySlot: selectedDeliverySlot ? {
+                    label: selectedDeliverySlot.label,
+                    startTime: selectedDeliverySlot.startTime,
+                    endTime: selectedDeliverySlot.endTime,
+                } : undefined,
                 itemsPrice,
                 deliveryFee,
+                discountAmount,
+                promoCode: promoResult.promoCode?.code || '',
                 totalPrice: calculatedTotal,
                 location: locationData
             });
 
             createdOrder = await order.save();
+            await recordOrderInventoryMovements(
+                validatedItems,
+                createdOrder._id,
+                'Sale',
+                req.user._id
+            );
+            if (promoResult.promoCode) {
+                await PromoCode.updateOne(
+                    { _id: promoResult.promoCode._id },
+                    { $inc: { usedCount: 1 } }
+                );
+            }
         } catch (error) {
             await restoreStock(validatedItems);
             throw error;
@@ -212,7 +348,10 @@ const addOrderItems = async (req, res) => {
 // @access  Private
 const getOrderById = async (req, res) => {
     try {
-        const order = await Order.findById(req.params.id).populate('user', 'name email phone');
+        const order = await Order.findById(req.params.id)
+            .populate('user', 'name email phone')
+            .populate('statusHistory.changedBy', 'name role')
+            .populate('assignedRider', 'name phone vehicleType vehicleNumber status');
 
         if (!order) {
             return res.status(404).json({ message: 'Order not found' });
@@ -235,11 +374,89 @@ const getMyOrders = async (req, res) => {
     try {
         const page = Math.max(Number(req.query.page) || 1, 1);
         const orders = await Order.find({ user: req.user._id })
+            .populate('assignedRider', 'name phone vehicleType vehicleNumber status')
             .sort({ createdAt: -1 })
             .skip((page - 1) * ORDER_PAGE_SIZE)
             .limit(ORDER_PAGE_SIZE);
 
         res.json({ orders, page, limit: ORDER_PAGE_SIZE });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+const getReorderPreview = async (req, res) => {
+    try {
+        const order = await Order.findById(req.params.id).lean();
+        if (!order) return res.status(404).json({ message: 'Order not found.' });
+        if (order.user.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Not authorized to reorder this order.' });
+        }
+
+        const availableItems = [];
+        const unavailableItems = [];
+        const adjustments = [];
+
+        for (const orderItem of order.orderItems) {
+            const product = await Product.findById(orderItem.product)
+                .populate('category', 'name')
+                .lean();
+            if (!product || !product.isActive) {
+                unavailableItems.push({
+                    name: orderItem.name,
+                    reason: 'This product is no longer available.',
+                });
+                continue;
+            }
+
+            let currentPrice = product.price;
+            let currentStock = product.stock;
+            let selectedVariant = null;
+            if (orderItem.variant) {
+                selectedVariant = (product.variants || []).find(
+                    variant => variant.unit === orderItem.variant
+                );
+                if (!selectedVariant) {
+                    unavailableItems.push({
+                        name: orderItem.name,
+                        reason: `The ${orderItem.variant} option is no longer available.`,
+                    });
+                    continue;
+                }
+                currentPrice = selectedVariant.price;
+                currentStock = selectedVariant.stock;
+            }
+
+            if (currentStock < 1) {
+                unavailableItems.push({
+                    name: orderItem.name,
+                    reason: 'Currently out of stock.',
+                });
+                continue;
+            }
+
+            const quantity = Math.min(orderItem.qty, currentStock);
+            if (quantity < orderItem.qty) {
+                adjustments.push(`${product.name}: quantity reduced from ${orderItem.qty} to ${quantity}.`);
+            }
+            if (Math.abs(currentPrice - orderItem.price) > 0.01) {
+                adjustments.push(`${product.name}: price is now Rs. ${currentPrice}.`);
+            }
+
+            availableItems.push({
+                product,
+                quantity,
+                selectedVariant,
+            });
+        }
+
+        res.json({
+            orderId: order._id,
+            availableItems,
+            unavailableItems,
+            adjustments,
+            canReorder: availableItems.length > 0,
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -280,6 +497,8 @@ const getOrders = async (req, res) => {
 
         const orders = await Order.find(query)
             .populate('user', 'id name email phone')
+            .populate('statusHistory.changedBy', 'name role')
+            .populate('assignedRider', 'name phone vehicleType vehicleNumber status')
             .sort({ createdAt: -1 })
             .skip((page - 1) * ORDER_PAGE_SIZE)
             .limit(ORDER_PAGE_SIZE);
@@ -307,17 +526,55 @@ const updateOrderStatus = async (req, res) => {
         }
 
         const previousStatus = order.status;
-        if (previousStatus === 'Cancelled') {
-            return res.status(400).json({ message: 'Cancelled orders cannot be updated.' });
+        if (!isStatusTransitionAllowed(previousStatus, req.body.status)) {
+            return res.status(400).json({
+                message: `Order cannot move from ${previousStatus} to ${req.body.status}.`
+            });
+        }
+        if (req.body.status === 'Out for Delivery') {
+            const activeRider = order.assignedRider
+                ? await Rider.findOne({
+                    _id: order.assignedRider,
+                    isActive: true,
+                    status: { $ne: 'Offline' },
+                }).select('_id')
+                : null;
+            if (!activeRider) {
+                return res.status(400).json({ message: 'Assign an active rider before dispatching this order.' });
+            }
+        }
+
+        const note = String(req.body.note || '').trim().slice(0, 300);
+        const cancellationReason = String(req.body.cancellationReason || '').trim().slice(0, 300);
+        if (req.body.status === 'Cancelled' && !cancellationReason) {
+            return res.status(400).json({ message: 'A cancellation reason is required.' });
         }
 
         order.status = req.body.status;
+        order.statusHistory.push({
+            status: req.body.status,
+            changedAt: new Date(),
+            changedBy: req.user._id,
+            note: req.body.status === 'Cancelled' ? cancellationReason : note,
+        });
 
         if (req.body.status === 'Cancelled') {
+            order.cancellationReason = cancellationReason;
             await restoreStock(order.orderItems);
+            await recordOrderInventoryMovements(
+                order.orderItems,
+                order._id,
+                'Cancellation',
+                req.user._id
+            );
         }
 
         const updatedOrder = await order.save();
+        await updatedOrder.populate('statusHistory.changedBy', 'name role');
+        await updatedOrder.populate('assignedRider', 'name phone vehicleType vehicleNumber status');
+        if (['Delivered', 'Cancelled'].includes(req.body.status)) {
+            await releaseRiderIfIdle(order.assignedRider?._id || order.assignedRider, order._id);
+        }
 
         await sendOrderStatusNotification(order);
 
@@ -347,11 +604,40 @@ const cancelMyOrder = async (req, res) => {
         }
 
         await restoreStock(order.orderItems);
+        await recordOrderInventoryMovements(
+            order.orderItems,
+            order._id,
+            'Cancellation',
+            req.user._id
+        );
         order.status = 'Cancelled';
+        order.cancellationReason = String(req.body.reason || 'Customer requested cancellation')
+            .trim()
+            .slice(0, 300);
+        order.statusHistory.push({
+            status: 'Cancelled',
+            changedAt: new Date(),
+            changedBy: req.user._id,
+            note: order.cancellationReason,
+        });
         const updatedOrder = await order.save();
+        await releaseRiderIfIdle(order.assignedRider, order._id);
 
         await sendOrderStatusNotification(order);
 
+        res.json(updatedOrder);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+const updateOrderAdminNote = async (req, res) => {
+    try {
+        const order = await Order.findById(req.params.id);
+        if (!order) return res.status(404).json({ message: 'Order not found' });
+
+        order.adminNote = String(req.body.adminNote || '').trim().slice(0, 1000);
+        const updatedOrder = await order.save();
         res.json(updatedOrder);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -362,7 +648,9 @@ module.exports = {
     addOrderItems,
     getOrderById,
     getMyOrders,
+    getReorderPreview,
     getOrders,
     updateOrderStatus,
-    cancelMyOrder
+    cancelMyOrder,
+    updateOrderAdminNote
 };

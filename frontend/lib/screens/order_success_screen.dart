@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../utils/helpers.dart';
 import 'main_screen.dart';
 import 'my_orders_screen.dart';
@@ -26,6 +27,10 @@ class OrderSuccessScreen extends StatelessWidget {
         : orderId.toUpperCase();
     final status = (order['status'] ?? 'Placed').toString();
     final shipping = Map<String, dynamic>.from(order['shippingAddress'] ?? {});
+    final deliverySlot = Map<String, dynamic>.from(order['deliverySlot'] ?? {});
+    final deliveryDate = DateTime.tryParse(
+      (order['deliveryDate'] ?? '').toString(),
+    );
     final items = List<dynamic>.from(order['orderItems'] ?? []);
 
     return Scaffold(
@@ -86,17 +91,38 @@ class OrderSuccessScreen extends StatelessWidget {
               const SizedBox(height: 14),
               _SectionCard(
                 title: 'Delivery Address',
-                child: Row(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.location_on_outlined, color: theme.colorScheme.primary),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        '${shipping['street'] ?? ''}\n${shipping['area'] ?? ''}, ${shipping['city'] ?? ''}\n${shipping['phone'] ?? ''}',
-                        style: GoogleFonts.inter(height: 1.45, color: Colors.grey[800]),
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.location_on_outlined,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '${shipping['street'] ?? ''}\n${shipping['area'] ?? ''}, ${shipping['city'] ?? ''}\n${shipping['phone'] ?? ''}',
+                            style: GoogleFonts.inter(
+                              height: 1.45,
+                              color: Colors.grey[800],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+                    if ((deliverySlot['label'] ?? '')
+                        .toString()
+                        .isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _infoPill(
+                        context,
+                        Icons.schedule_outlined,
+                        '${deliveryDate == null ? '' : '${DateFormat('EEE, d MMM').format(deliveryDate)} / '}${deliverySlot['label']} / ${deliverySlot['startTime']} - ${deliverySlot['endTime']}',
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -105,27 +131,46 @@ class OrderSuccessScreen extends StatelessWidget {
                 title: 'Items',
                 child: Column(
                   children: [
-                    ...items.map((item) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  '${item['qty']}x ${item['name']}',
-                                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                    ...items.map(
+                      (item) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${item['qty']}x ${item['name']}',
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              Text(
-                                Helpers.formatCurrency((item['qty'] ?? 0) * (item['price'] ?? 0)),
-                                style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                            ),
+                            Text(
+                              Helpers.formatCurrency(
+                                (item['qty'] ?? 0) * (item['price'] ?? 0),
                               ),
-                            ],
-                          ),
-                        )),
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     const Divider(height: 24),
-                    _priceRow('Items', order['itemsPrice'] ?? order['totalPrice']),
+                    _priceRow(
+                      'Items',
+                      order['itemsPrice'] ?? order['totalPrice'],
+                    ),
                     const SizedBox(height: 8),
                     _priceRow('Delivery', order['deliveryFee'] ?? 0),
+                    if ((order['discountAmount'] ?? 0) is num &&
+                        (order['discountAmount'] ?? 0) > 0) ...[
+                      const SizedBox(height: 8),
+                      _priceRow(
+                        'Discount (${order['promoCode'] ?? ''})',
+                        -(order['discountAmount'] ?? 0),
+                      ),
+                    ],
                     const Divider(height: 24),
                     _priceRow('Total', order['totalPrice'], isTotal: true),
                   ],
@@ -169,6 +214,7 @@ class OrderSuccessScreen extends StatelessWidget {
   }
 
   Widget _priceRow(String label, dynamic amount, {bool isTotal = false}) {
+    final isNegative = amount is num && amount < 0;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -180,13 +226,39 @@ class OrderSuccessScreen extends StatelessWidget {
           ),
         ),
         Text(
-          Helpers.formatCurrency(amount),
+          '${isNegative ? '-' : ''}${Helpers.formatCurrency(isNegative ? amount.abs() : amount)}',
           style: GoogleFonts.inter(
+            color: isNegative ? Colors.green : null,
             fontWeight: FontWeight.w800,
             fontSize: isTotal ? 18 : 14,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _infoPill(BuildContext context, IconData icon, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -218,7 +290,10 @@ class _SectionCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16),
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
           ),
           const SizedBox(height: 12),
           child,
@@ -266,7 +341,9 @@ class _OrderTimeline extends StatelessWidget {
                   Container(
                     width: 2,
                     height: 24,
-                    color: index < currentIndex ? activeColor : Colors.grey.shade300,
+                    color: index < currentIndex
+                        ? activeColor
+                        : Colors.grey.shade300,
                   ),
               ],
             ),

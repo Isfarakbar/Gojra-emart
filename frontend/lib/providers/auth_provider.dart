@@ -12,12 +12,31 @@ class AuthProvider with ChangeNotifier {
   final _storage = const FlutterSecureStorage();
   static const String _googleWebClientId = String.fromEnvironment(
     'GOOGLE_WEB_CLIENT_ID',
-    defaultValue: '357186664125-bb22gkb81i3klrcl7jttc1sive0vake6.apps.googleusercontent.com',
+    defaultValue:
+        '357186664125-bb22gkb81i3klrcl7jttc1sive0vake6.apps.googleusercontent.com',
   );
-  
+
   String? _token;
   Map<String, dynamic>? _user;
   bool _notificationsInitialized = false;
+
+  AuthProvider() {
+    ApiService.accountAccessError.addListener(_handleAccountAccessError);
+  }
+
+  void _handleAccountAccessError() {
+    if (ApiService.accountAccessError.value == null || _token == null) return;
+    _user = null;
+    _token = null;
+    _notificationsInitialized = false;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    ApiService.accountAccessError.removeListener(_handleAccountAccessError);
+    super.dispose();
+  }
 
   bool get isAuthenticated => _token != null;
   Map<String, dynamic>? get user => _user;
@@ -34,6 +53,7 @@ class AuthProvider with ChangeNotifier {
     }
     return null;
   }
+
   bool get needsProfileSetup {
     final name = (_user?['name'] ?? '').toString().trim();
     final address = (_user?['address'] ?? '').toString().trim();
@@ -53,17 +73,22 @@ class AuthProvider with ChangeNotifier {
       }
 
       // Sign into Firebase Auth with the Google credential to get a Firebase ID token
-      final credential = fb.GoogleAuthProvider.credential(idToken: googleIdToken);
-      final fbUser = await fb.FirebaseAuth.instance.signInWithCredential(credential);
+      final credential = fb.GoogleAuthProvider.credential(
+        idToken: googleIdToken,
+      );
+      final fbUser = await fb.FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
       final firebaseIdToken = await fbUser.user?.getIdToken();
 
       if (firebaseIdToken == null) {
         return 'Firebase authentication failed. Please try again.';
       }
 
-      final response = await _apiService.dio.post('/auth/google', data: {
-        'token': firebaseIdToken,
-      });
+      final response = await _apiService.dio.post(
+        '/auth/google',
+        data: {'token': firebaseIdToken},
+      );
 
       if (response.statusCode == 200) {
         _token = response.data['token'];
@@ -91,10 +116,10 @@ class AuthProvider with ChangeNotifier {
 
   Future<String?> login(String email, String password) async {
     try {
-      final response = await _apiService.dio.post('/auth/login', data: {
-        'email': email,
-        'password': password,
-      });
+      final response = await _apiService.dio.post(
+        '/auth/login',
+        data: {'email': email, 'password': password},
+      );
 
       if (response.statusCode == 200) {
         _token = response.data['token'];
@@ -115,14 +140,22 @@ class AuthProvider with ChangeNotifier {
     return 'Login failed';
   }
 
-  Future<String?> register(String name, String email, String password, String phone) async {
+  Future<String?> register(
+    String name,
+    String email,
+    String password,
+    String phone,
+  ) async {
     try {
-      final response = await _apiService.dio.post('/auth/register', data: {
-        'name': name,
-        'email': email,
-        'password': password,
-        'phone': phone,
-      });
+      final response = await _apiService.dio.post(
+        '/auth/register',
+        data: {
+          'name': name,
+          'email': email,
+          'password': password,
+          'phone': phone,
+        },
+      );
 
       if (response.statusCode == 201) {
         _token = response.data['token'];
@@ -133,7 +166,7 @@ class AuthProvider with ChangeNotifier {
         return null; // No error
       }
     } on DioException catch (e) {
-       if (e.response != null) {
+      if (e.response != null) {
         return e.response?.data['message'] ?? 'Registration failed';
       }
       return 'Connection error. Please check your internet.';
@@ -143,15 +176,14 @@ class AuthProvider with ChangeNotifier {
     return 'Registration failed';
   }
 
-
-
-  Future<String?> updateProfile(String name, String phone, String address, {String? password}) async {
+  Future<String?> updateProfile(
+    String name,
+    String phone,
+    String address, {
+    String? password,
+  }) async {
     try {
-      final data = {
-        'name': name,
-        'phone': phone,
-        'address': address,
-      };
+      final data = {'name': name, 'phone': phone, 'address': address};
       if (password != null && password.isNotEmpty) {
         data['password'] = password;
       }
@@ -170,7 +202,7 @@ class AuthProvider with ChangeNotifier {
         return null;
       }
     } on DioException catch (e) {
-       if (e.response != null) {
+      if (e.response != null) {
         return e.response?.data['message'] ?? 'Update failed';
       }
       return 'Connection error.';
@@ -192,9 +224,10 @@ class AuthProvider with ChangeNotifier {
   // --- Password Recovery ---
   Future<String?> forgotPassword(String email) async {
     try {
-      final response = await _apiService.dio.post('/auth/forgot-password', data: {
-        'email': email,
-      });
+      final response = await _apiService.dio.post(
+        '/auth/forgot-password',
+        data: {'email': email},
+      );
       if (response.statusCode == 200) {
         return null; // Success
       }
@@ -208,10 +241,10 @@ class AuthProvider with ChangeNotifier {
 
   Future<String?> verifyOTP(String email, String otp) async {
     try {
-      final response = await _apiService.dio.post('/auth/verify-otp', data: {
-        'email': email,
-        'otp': otp,
-      });
+      final response = await _apiService.dio.post(
+        '/auth/verify-otp',
+        data: {'email': email, 'otp': otp},
+      );
       if (response.statusCode == 200) {
         return null; // Success
       }
@@ -223,13 +256,16 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<String?> resetPassword(String email, String otp, String newPassword) async {
+  Future<String?> resetPassword(
+    String email,
+    String otp,
+    String newPassword,
+  ) async {
     try {
-      final response = await _apiService.dio.post('/auth/reset-password', data: {
-        'email': email,
-        'otp': otp,
-        'newPassword': newPassword,
-      });
+      final response = await _apiService.dio.post(
+        '/auth/reset-password',
+        data: {'email': email, 'otp': otp, 'newPassword': newPassword},
+      );
       if (response.statusCode == 200) {
         return null; // Success
       }
@@ -244,17 +280,18 @@ class AuthProvider with ChangeNotifier {
   // --- Firebase Phone Login ---
   Future<String?> firebasePhoneLogin(String firebaseIdToken) async {
     try {
-      final response = await _apiService.dio.post('/auth/phone', data: {
-        'firebaseIdToken': firebaseIdToken,
-      });
+      final response = await _apiService.dio.post(
+        '/auth/phone',
+        data: {'firebaseIdToken': firebaseIdToken},
+      );
 
       if (response.statusCode == 200) {
         _user = response.data;
         _token = _user!['token'];
-        
+
         await _saveSession();
         await _registerNotifications();
-        
+
         notifyListeners();
         return null; // Success
       }
@@ -269,7 +306,7 @@ class AuthProvider with ChangeNotifier {
   Future<bool> tryAutoLogin() async {
     final token = await _storage.read(key: 'token');
     if (token == null) return false;
-    
+
     _token = token;
     final storedUser = await _storage.read(key: 'user');
     if (storedUser != null) {
@@ -294,7 +331,10 @@ class AuthProvider with ChangeNotifier {
 
   Future<String?> addAddress(Map<String, dynamic> address) async {
     try {
-      final response = await _apiService.dio.post('/users/addresses', data: address);
+      final response = await _apiService.dio.post(
+        '/users/addresses',
+        data: address,
+      );
       _mergeAddressResponse(response.data);
       await _saveSession();
       notifyListeners();
@@ -308,7 +348,10 @@ class AuthProvider with ChangeNotifier {
 
   Future<String?> updateAddress(String id, Map<String, dynamic> address) async {
     try {
-      final response = await _apiService.dio.put('/users/addresses/$id', data: address);
+      final response = await _apiService.dio.put(
+        '/users/addresses/$id',
+        data: address,
+      );
       _mergeAddressResponse(response.data);
       await _saveSession();
       notifyListeners();
@@ -336,7 +379,9 @@ class AuthProvider with ChangeNotifier {
 
   Future<String?> setDefaultAddress(String id) async {
     try {
-      final response = await _apiService.dio.put('/users/addresses/$id/default');
+      final response = await _apiService.dio.put(
+        '/users/addresses/$id/default',
+      );
       _mergeAddressResponse(response.data);
       await _saveSession();
       notifyListeners();

@@ -91,6 +91,14 @@ const loginUser = async (req, res) => {
         const user = await User.findOne({ email: email.trim().toLowerCase() });
 
         if (user && (await user.matchPassword(password))) {
+            if (user.accountStatus === 'Suspended') {
+                return res.status(403).json({
+                    code: 'ACCOUNT_SUSPENDED',
+                    message: user.suspendedReason
+                        ? `Your account is suspended: ${user.suspendedReason}`
+                        : 'Your account has been suspended. Please contact support.',
+                });
+            }
             const token = generateToken(user._id);
             setAuthCookie(res, token);
             res.json({
@@ -144,6 +152,15 @@ const googleLogin = async (req, res) => {
             });
         }
 
+        if (user.accountStatus === 'Suspended') {
+            return res.status(403).json({
+                code: 'ACCOUNT_SUSPENDED',
+                message: user.suspendedReason
+                    ? `Your account is suspended: ${user.suspendedReason}`
+                    : 'Your account has been suspended. Please contact support.',
+            });
+        }
+
         res.json({
             _id: user._id,
             name: user.name,
@@ -188,6 +205,15 @@ const firebasePhoneLogin = async (req, res) => {
             user = await User.create({
                 name: 'New User', // Default name, can be updated later
                 phone: phone_number,
+            });
+        }
+
+        if (user.accountStatus === 'Suspended') {
+            return res.status(403).json({
+                code: 'ACCOUNT_SUSPENDED',
+                message: user.suspendedReason
+                    ? `Your account is suspended: ${user.suspendedReason}`
+                    : 'Your account has been suspended. Please contact support.',
             });
         }
 

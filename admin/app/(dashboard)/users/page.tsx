@@ -1,232 +1,263 @@
 "use client";
 
 import { useCallback, useEffect, useState } from 'react';
+import { Ban, Calendar, CheckCircle2, Loader2, Mail, Phone, Search, Shield, ShoppingBag, User as UserIcon, Users, X } from 'lucide-react';
 import api from '@/lib/api';
-import { Loader2, Users, Search, Mail, Phone, Shield, User as UserIcon, Calendar } from 'lucide-react';
+import { getErrorMessage } from '@/lib/getErrorMessage';
 
 interface User {
     _id: string;
     name: string;
-    email: string;
+    email?: string;
     phone?: string;
     role: 'user' | 'admin';
+    accountStatus?: 'Active' | 'Suspended';
+    suspendedReason?: string;
     address?: string;
     createdAt: string;
+    orderStats: {
+        totalOrders: number;
+        deliveredOrders: number;
+        totalSpent: number;
+        lastOrderAt?: string;
+    };
 }
 
 export default function UsersPage() {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
+    const [searchInput, setSearchInput] = useState('');
     const [search, setSearch] = useState('');
-    const [filter, setFilter] = useState<'all' | 'user' | 'admin'>('all');
+    const [role, setRole] = useState('');
+    const [status, setStatus] = useState('');
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalUsers, setTotalUsers] = useState(0);
+    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+    const [reason, setReason] = useState('');
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
 
-    const fetchUsers = useCallback(async (targetPage = page) => {
+    const fetchUsers = useCallback(async () => {
+        setLoading(true);
+        setError('');
         try {
-            const { data } = await api.get('/users', { params: { page: targetPage } });
-            setUsers(data.users ?? data);
-            setTotalPages(data.pages ?? 1);
-            setTotalUsers(data.total ?? (data.users ?? data).length);
-        } catch (error) {
-            console.error(error);
-            alert('Failed to fetch users');
+            const { data } = await api.get('/users', {
+                params: {
+                    page,
+                    search: search || undefined,
+                    role: role || undefined,
+                    status: status || undefined,
+                },
+            });
+            setUsers(data.users || []);
+            setTotalPages(data.pages || 1);
+            setTotalUsers(data.total || 0);
+        } catch (err: unknown) {
+            setError(getErrorMessage(err, 'Could not load customers.'));
         } finally {
             setLoading(false);
         }
-    }, [page]);
+    }, [page, role, search, status]);
 
     useEffect(() => {
-        fetchUsers(page);
-    }, [fetchUsers, page]);
+        fetchUsers();
+    }, [fetchUsers]);
 
-    const filteredUsers = users.filter(user => {
-        const matchSearch =
-            user.name.toLowerCase().includes(search.toLowerCase()) ||
-            (user.email ?? '').toLowerCase().includes(search.toLowerCase());
-        const matchFilter = filter === 'all' || user.role === filter;
-        return matchSearch && matchFilter;
-    });
+    const applySearch = () => {
+        setPage(1);
+        setSearch(searchInput.trim());
+    };
 
-    const adminCount = users.filter(u => u.role === 'admin').length;
-    const userCount = users.filter(u => u.role === 'user').length;
+    const changeStatus = async () => {
+        if (!selectedUser) return;
+        const nextStatus = selectedUser.accountStatus === 'Suspended' ? 'Active' : 'Suspended';
+        if (nextStatus === 'Suspended' && !reason.trim()) {
+            setError('Enter a reason before suspending this customer.');
+            return;
+        }
+
+        setSaving(true);
+        setError('');
+        try {
+            await api.put(`/users/${selectedUser._id}/status`, {
+                status: nextStatus,
+                reason: reason.trim(),
+            });
+            setSelectedUser(null);
+            setReason('');
+            await fetchUsers();
+        } catch (err: unknown) {
+            setError(getErrorMessage(err, 'Could not update this customer.'));
+        } finally {
+            setSaving(false);
+        }
+    };
 
     return (
-        <div>
-            {/* Page Header */}
-            <div className="flex justify-between items-start mb-8">
+        <div className="space-y-6">
+            <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-800">Users</h2>
-                    <p className="text-gray-500 text-sm mt-1">Manage registered users and admins</p>
+                    <h2 className="text-2xl font-bold text-gray-800">Customers</h2>
+                    <p className="mt-1 text-sm text-gray-500">Customer activity, spending, and account access.</p>
                 </div>
-                <div className="flex gap-4">
-                    <div className="bg-white px-4 py-3 rounded-xl border border-gray-100 shadow-sm text-center">
-                        <p className="text-2xl font-bold text-gray-800">{users.length}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">This Page</p>
-                    </div>
-                    <div className="bg-white px-4 py-3 rounded-xl border border-gray-100 shadow-sm text-center">
-                        <p className="text-2xl font-bold text-purple-600">{adminCount}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">Admins</p>
-                    </div>
-                    <div className="bg-white px-4 py-3 rounded-xl border border-gray-100 shadow-sm text-center">
-                        <p className="text-2xl font-bold text-blue-600">{userCount}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">Customers</p>
-                    </div>
+                <div className="rounded-lg border border-gray-200 bg-white px-5 py-3 text-right">
+                    <p className="text-2xl font-bold text-gray-900">{totalUsers}</p>
+                    <p className="text-xs text-gray-500">Matching accounts</p>
                 </div>
             </div>
 
-            {/* Filters */}
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-6 flex flex-col sm:flex-row gap-4">
-                {/* Search */}
-                <div className="flex-1 relative">
+            <div className="grid gap-3 rounded-lg border border-gray-200 bg-white p-4 md:grid-cols-[1fr_180px_180px_auto]">
+                <div className="relative">
                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
-                        type="text"
-                        placeholder="Search by name or email..."
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                        value={searchInput}
+                        onChange={event => setSearchInput(event.target.value)}
+                        onKeyDown={event => event.key === 'Enter' && applySearch()}
+                        placeholder="Search name, email, or phone"
+                        className="w-full rounded-md border border-gray-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-500"
                     />
                 </div>
-                {/* Role Filter */}
-                <div className="flex gap-2">
-                    {(['all', 'user', 'admin'] as const).map(f => (
-                        <button
-                            key={f}
-                            onClick={() => setFilter(f)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition ${filter === f
-                                ? 'bg-blue-600 text-white shadow-sm'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
-                        >
-                            {f === 'all' ? 'All Roles' : f === 'admin' ? '🔑 Admins' : '👤 Customers'}
-                        </button>
-                    ))}
-                </div>
+                <select value={role} onChange={event => { setRole(event.target.value); setPage(1); }} className="rounded-md border border-gray-200 px-3 py-2 text-sm">
+                    <option value="">All roles</option>
+                    <option value="user">Customers</option>
+                    <option value="admin">Admins</option>
+                </select>
+                <select value={status} onChange={event => { setStatus(event.target.value); setPage(1); }} className="rounded-md border border-gray-200 px-3 py-2 text-sm">
+                    <option value="">All statuses</option>
+                    <option value="Active">Active</option>
+                    <option value="Suspended">Suspended</option>
+                </select>
+                <button onClick={applySearch} className="rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700">Search</button>
             </div>
 
-            {/* Table */}
-            {loading ? (
-                <div className="flex justify-center p-10">
-                    <Loader2 className="animate-spin text-blue-600 w-8 h-8" />
-                </div>
-            ) : (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                    <table className="w-full text-left">
-                        <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wider">
-                            <tr>
-                                <th className="p-4 font-semibold">User</th>
-                                <th className="p-4 font-semibold">Contact</th>
-                                <th className="p-4 font-semibold">Role</th>
-                                <th className="p-4 font-semibold">Address</th>
-                                <th className="p-4 font-semibold">Joined</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {filteredUsers.map(user => (
-                                <tr key={user._id} className="hover:bg-gray-50/50 transition">
-                                    {/* Avatar + Name */}
-                                    <td className="p-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${user.role === 'admin'
-                                                ? 'bg-purple-100 text-purple-700'
-                                                : 'bg-blue-100 text-blue-700'
-                                                }`}>
-                                                {user.name.charAt(0).toUpperCase()}
-                                            </div>
-                                            <div>
-                                                <p className="font-semibold text-gray-800 text-sm">{user.name}</p>
-                                                <p className="text-xs text-gray-400 font-mono">{user._id.slice(-8)}</p>
-                                            </div>
-                                        </div>
-                                    </td>
+            {error && <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
-                                    {/* Contact */}
-                                    <td className="p-4">
-                                        <div className="flex flex-col gap-1">
-                                            <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                                                <Mail size={13} className="text-gray-400" />
-                                                {user.email || 'No email'}
-                                            </div>
-                                            {user.phone && (
-                                                <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                                                    <Phone size={12} />
-                                                    {user.phone}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </td>
-
-                                    {/* Role Badge */}
-                                    <td className="p-4">
-                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${user.role === 'admin'
-                                            ? 'bg-purple-100 text-purple-700'
-                                            : 'bg-gray-100 text-gray-600'
-                                            }`}>
-                                            {user.role === 'admin' ? <Shield size={11} /> : <UserIcon size={11} />}
-                                            {user.role === 'admin' ? 'Admin' : 'Customer'}
-                                        </span>
-                                    </td>
-
-                                    {/* Address */}
-                                    <td className="p-4">
-                                        <span className="text-sm text-gray-500 max-w-[150px] truncate block">
-                                            {user.address || <span className="text-gray-300 italic">Not set</span>}
-                                        </span>
-                                    </td>
-
-                                    {/* Join Date */}
-                                    <td className="p-4">
-                                        <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                                            <Calendar size={13} />
-                                            {new Date(user.createdAt).toLocaleDateString(undefined, {
-                                                year: 'numeric', month: 'short', day: 'numeric'
-                                            })}
-                                        </div>
-                                    </td>
+            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+                {loading ? (
+                    <div className="flex justify-center p-14"><Loader2 className="animate-spin text-blue-600" /></div>
+                ) : users.length === 0 ? (
+                    <div className="p-14 text-center text-gray-500"><Users className="mx-auto mb-3 text-gray-300" />No accounts found.</div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500">
+                                <tr>
+                                    <th className="p-4 font-semibold">Customer</th>
+                                    <th className="p-4 font-semibold">Contact</th>
+                                    <th className="p-4 font-semibold">Orders</th>
+                                    <th className="p-4 font-semibold">Spent</th>
+                                    <th className="p-4 font-semibold">Status</th>
+                                    <th className="p-4 font-semibold">Joined</th>
+                                    <th className="p-4 text-right font-semibold">Access</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 text-sm">
+                                {users.map(user => {
+                                    const suspended = user.accountStatus === 'Suspended';
+                                    return (
+                                        <tr key={user._id} className="hover:bg-gray-50">
+                                            <td className="p-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`flex h-9 w-9 items-center justify-center rounded-full font-bold ${user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                        {(user.name || 'U').charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-semibold text-gray-900">{user.name}</p>
+                                                        <p className="flex items-center gap-1 text-xs text-gray-400">
+                                                            {user.role === 'admin' ? <Shield size={11} /> : <UserIcon size={11} />}
+                                                            {user.role === 'admin' ? 'Admin' : 'Customer'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="p-4 text-gray-600">
+                                                <p className="flex items-center gap-1.5"><Mail size={13} />{user.email || 'No email'}</p>
+                                                <p className="mt-1 flex items-center gap-1.5 text-xs"><Phone size={12} />{user.phone || 'No phone'}</p>
+                                            </td>
+                                            <td className="p-4">
+                                                <p className="flex items-center gap-1.5 font-semibold text-gray-800"><ShoppingBag size={14} />{user.orderStats?.totalOrders || 0}</p>
+                                                <p className="mt-1 text-xs text-gray-500">{user.orderStats?.deliveredOrders || 0} delivered</p>
+                                            </td>
+                                            <td className="p-4 font-semibold text-gray-800">Rs. {(user.orderStats?.totalSpent || 0).toLocaleString()}</td>
+                                            <td className="p-4">
+                                                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${suspended ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                                    {suspended ? <Ban size={12} /> : <CheckCircle2 size={12} />}
+                                                    {suspended ? 'Suspended' : 'Active'}
+                                                </span>
+                                                {suspended && user.suspendedReason && <p className="mt-1 max-w-48 truncate text-xs text-red-600" title={user.suspendedReason}>{user.suspendedReason}</p>}
+                                            </td>
+                                            <td className="p-4 text-xs text-gray-500">
+                                                <span className="flex items-center gap-1.5"><Calendar size={13} />{new Date(user.createdAt).toLocaleDateString()}</span>
+                                            </td>
+                                            <td className="p-4 text-right">
+                                                {user.role === 'user' && (
+                                                    <button
+                                                        onClick={() => { setSelectedUser(user); setReason(user.suspendedReason || ''); setError(''); }}
+                                                        className={`rounded-md px-3 py-2 text-xs font-semibold ${suspended ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-red-50 text-red-700 hover:bg-red-100'}`}
+                                                    >
+                                                        {suspended ? 'Reactivate' : 'Suspend'}
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
 
-                    {filteredUsers.length === 0 && (
-                        <div className="p-12 text-center">
-                            <Users className="mx-auto mb-3 text-gray-300" size={40} />
-                            <p className="text-gray-500 font-medium">
-                                {search ? 'No users match your search' : 'No users found'}
-                            </p>
-                            <p className="text-gray-400 text-sm mt-1">
-                                {search ? 'Try a different name or email' : 'Users will appear here after they register'}
-                            </p>
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-between border-t border-gray-200 bg-gray-50 px-4 py-3 text-sm">
+                        <span className="text-gray-500">Page {page} of {totalPages}</span>
+                        <div className="flex gap-2">
+                            <button disabled={page === 1} onClick={() => setPage(value => value - 1)} className="rounded-md border bg-white px-3 py-1.5 disabled:opacity-40">Previous</button>
+                            <button disabled={page === totalPages} onClick={() => setPage(value => value + 1)} className="rounded-md border bg-white px-3 py-1.5 disabled:opacity-40">Next</button>
                         </div>
-                    )}
+                    </div>
+                )}
+            </div>
 
-                    {/* Table Footer */}
-                    {filteredUsers.length > 0 && (
-                        <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50/50 p-4 text-xs text-gray-400">
-                            <span>Showing {filteredUsers.length} of {users.length} users on this page. Total users: {totalUsers}</span>
-                            {totalPages > 1 && (
-                                <div className="flex items-center gap-2 text-sm">
-                                    <button
-                                        onClick={() => setPage((current) => Math.max(current - 1, 1))}
-                                        disabled={page <= 1}
-                                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 font-medium text-gray-600 disabled:opacity-50"
-                                    >
-                                        Previous
-                                    </button>
-                                    <span className="text-gray-500">Page {page} of {totalPages}</span>
-                                    <button
-                                        onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
-                                        disabled={page >= totalPages}
-                                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 font-medium text-gray-600 disabled:opacity-50"
-                                    >
-                                        Next
-                                    </button>
-                                </div>
+            {selectedUser && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
+                        <div className="flex items-center justify-between border-b px-5 py-4">
+                            <div>
+                                <h3 className="font-bold text-gray-900">{selectedUser.accountStatus === 'Suspended' ? 'Reactivate customer' : 'Suspend customer'}</h3>
+                                <p className="text-sm text-gray-500">{selectedUser.name}</p>
+                            </div>
+                            <button onClick={() => setSelectedUser(null)} className="p-1 text-gray-400 hover:text-gray-700"><X size={20} /></button>
+                        </div>
+                        <div className="p-5">
+                            {selectedUser.accountStatus === 'Suspended' ? (
+                                <p className="text-sm text-gray-600">This customer will regain access immediately and can sign in and place orders again.</p>
+                            ) : (
+                                <label className="block">
+                                    <span className="text-sm font-semibold text-gray-700">Reason</span>
+                                    <textarea
+                                        value={reason}
+                                        onChange={event => setReason(event.target.value)}
+                                        rows={4}
+                                        maxLength={300}
+                                        placeholder="Explain why this account is being suspended"
+                                        className="mt-2 w-full resize-none rounded-md border border-gray-200 p-3 text-sm outline-none focus:border-red-500"
+                                    />
+                                </label>
                             )}
                         </div>
-                    )}
+                        <div className="flex justify-end gap-2 border-t bg-gray-50 px-5 py-4">
+                            <button onClick={() => setSelectedUser(null)} className="rounded-md border bg-white px-4 py-2 text-sm font-semibold text-gray-600">Cancel</button>
+                            <button
+                                disabled={saving}
+                                onClick={changeStatus}
+                                className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${selectedUser.accountStatus === 'Suspended' ? 'bg-green-600' : 'bg-red-600'}`}
+                            >
+                                {saving && <Loader2 size={15} className="animate-spin" />}
+                                {selectedUser.accountStatus === 'Suspended' ? 'Reactivate' : 'Suspend'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

@@ -2,18 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { Plus, Trash2, Loader2, UploadCloud } from 'lucide-react';
+import { Edit, Eye, EyeOff, Plus, Trash2, Loader2, UploadCloud } from 'lucide-react';
 import Image from 'next/image';
 
 interface Category {
     _id: string;
     name: string;
     image?: string;
+    isActive?: boolean;
+    order?: number;
 }
 
 interface CategoryPayload {
     name: string;
     image?: string;
+    isActive?: boolean;
+    order?: number;
 }
 
 export default function CategoriesPage() {
@@ -24,6 +28,8 @@ export default function CategoriesPage() {
 
     // Form State
     const [name, setName] = useState('');
+    const [order, setOrder] = useState('0');
+    const [isActive, setIsActive] = useState(true);
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -33,7 +39,7 @@ export default function CategoriesPage() {
 
     const fetchCategories = async () => {
         try {
-            const { data } = await api.get('/categories');
+            const { data } = await api.get('/categories/admin');
             setCategories(data);
         } catch (error) {
             console.error(error);
@@ -57,6 +63,8 @@ export default function CategoriesPage() {
     const handleEdit = (category: Category) => {
         setEditingId(category._id);
         setName(category.name);
+        setOrder(String(category.order ?? 0));
+        setIsActive(category.isActive !== false);
         setIsModalOpen(true);
     };
 
@@ -74,7 +82,11 @@ export default function CategoriesPage() {
                 imageUrl = uploadRes.data.url;
             }
 
-            const payload: CategoryPayload = { name };
+            const payload: CategoryPayload = {
+                name,
+                order: Number(order) || 0,
+                isActive,
+            };
             if (imageUrl) payload.image = imageUrl;
 
             if (editingId) {
@@ -96,8 +108,22 @@ export default function CategoriesPage() {
 
     const resetForm = () => {
         setName('');
+        setOrder('0');
+        setIsActive(true);
         setImageFile(null);
         setEditingId(null);
+    };
+
+    const toggleCategoryVisibility = async (category: Category) => {
+        try {
+            const { data } = await api.put(`/categories/${category._id}`, {
+                isActive: category.isActive === false,
+            });
+            setCategories(items => items.map(item => item._id === category._id ? data : item));
+        } catch (error) {
+            console.error(error);
+            alert('Failed to update category visibility');
+        }
     };
 
     return (
@@ -115,12 +141,14 @@ export default function CategoriesPage() {
             {loading ? (
                 <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>
             ) : (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden max-w-3xl">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden max-w-4xl">
                     <table className="w-full text-left border-collapse">
                         <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 text-sm">
                             <tr>
                                 <th className="p-4 font-medium">Icon</th>
                                 <th className="p-4 font-medium">Name</th>
+                                <th className="p-4 font-medium">Order</th>
+                                <th className="p-4 font-medium">Visibility</th>
                                 <th className="p-4 font-medium text-right">Actions</th>
                             </tr>
                         </thead>
@@ -130,7 +158,7 @@ export default function CategoriesPage() {
                                     <td className="p-4">
                                         {category.image ? (
                                             <div className="w-10 h-10 relative rounded-full overflow-hidden border">
-                                                <Image src={category.image} alt={category.name} fill className="object-cover" />
+                                                <Image src={category.image} alt={category.name} fill sizes="40px" className="object-cover" />
                                             </div>
                                         ) : (
                                             <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 font-bold border">
@@ -139,13 +167,25 @@ export default function CategoriesPage() {
                                         )}
                                     </td>
                                     <td className="p-4 font-medium text-base">{category.name}</td>
+                                    <td className="p-4 text-gray-500">{category.order ?? 0}</td>
+                                    <td className="p-4">
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${category.isActive === false ? 'bg-gray-100 text-gray-600' : 'bg-blue-100 text-blue-700'}`}>
+                                            {category.isActive === false ? 'Hidden' : 'Active'}
+                                        </span>
+                                    </td>
                                     <td className="p-4 text-right">
+                                        <button
+                                            onClick={() => toggleCategoryVisibility(category)}
+                                            className={`p-2 rounded-lg transition mr-1 ${category.isActive === false ? 'text-green-600 hover:bg-green-50' : 'text-gray-500 hover:bg-gray-50'}`}
+                                            title={category.isActive === false ? 'Show category' : 'Hide category'}
+                                        >
+                                            {category.isActive === false ? <Eye size={18} /> : <EyeOff size={18} />}
+                                        </button>
                                         <button
                                             onClick={() => handleEdit(category)}
                                             className="text-blue-500 hover:text-blue-700 p-2 hover:bg-blue-50 rounded-lg transition mr-1"
                                         >
-                                            {/* We can re-use the Edit icon if we import it, or just use text if icon is missing */}
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
+                                            <Edit size={18} />
                                         </button>
                                         <button
                                             onClick={() => handleDelete(category._id)}
@@ -180,6 +220,26 @@ export default function CategoriesPage() {
                                     placeholder="e.g., Fruits"
                                 />
                             </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Display Order</label>
+                                <input
+                                    type="number"
+                                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                                    value={order}
+                                    onChange={e => setOrder(e.target.value)}
+                                />
+                            </div>
+
+                            <label className="flex items-center justify-between gap-3 border rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+                                <span>Visible in customer app</span>
+                                <input
+                                    type="checkbox"
+                                    checked={isActive}
+                                    onChange={e => setIsActive(e.target.checked)}
+                                    className="h-4 w-4 accent-blue-600"
+                                />
+                            </label>
 
                             <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Icon/Image {editingId && '(Leave empty to keep existing)'}</label>

@@ -2,22 +2,40 @@
 
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { Loader2, UploadCloud, Trash2, Plus, Layout, Image as ImageIcon } from 'lucide-react';
+import { Edit, ImagePlus, LayoutPanelTop, Loader2, Plus, Save, Trash2, X } from 'lucide-react';
 import Image from 'next/image';
+
+interface HomeSettings {
+    headerTitle: string;
+    headerSubtitle: string;
+    searchPlaceholder: string;
+    categoryTitle: string;
+    exploreTitle: string;
+    showBanners: boolean;
+    showCategories: boolean;
+    showDynamicSections: boolean;
+    showExploreProducts: boolean;
+}
 
 interface Banner {
     _id: string;
     title: string;
     subtitle?: string;
     imageUrl: string;
+    linkType: 'product' | 'category' | 'none';
+    linkId?: string;
+    isActive: boolean;
+    order: number;
 }
 
 interface HomeSection {
     _id: string;
     title: string;
-    type: string;
-    filterType: string;
-    categoryName?: string;
+    type: 'horizontal' | 'grid';
+    filterType: 'featured' | 'latest' | 'category';
+    categoryId?: string;
+    isActive: boolean;
+    order: number;
 }
 
 interface Category {
@@ -25,233 +43,453 @@ interface Category {
     name: string;
 }
 
+const emptySettings: HomeSettings = {
+    headerTitle: '',
+    headerSubtitle: '',
+    searchPlaceholder: '',
+    categoryTitle: '',
+    exploreTitle: '',
+    showBanners: true,
+    showCategories: true,
+    showDynamicSections: true,
+    showExploreProducts: true,
+};
+
 export default function HomeLayoutPage() {
+    const [settings, setSettings] = useState<HomeSettings>(emptySettings);
     const [banners, setBanners] = useState<Banner[]>([]);
     const [sections, setSections] = useState<HomeSection[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    const [bannerForm, setBannerForm] = useState({ title: '', subtitle: '', order: 0 });
-    const [bannerImage, setBannerImage] = useState<File | null>(null);
-    const [submittingBanner, setSubmittingBanner] = useState(false);
-
-    const [sectionForm, setSectionForm] = useState({ title: '', type: 'horizontal', filterType: 'latest', categoryId: '', order: 0 });
     const [categories, setCategories] = useState<Category[]>([]);
-    const [submittingSection, setSubmittingSection] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
+    const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+    const [bannerForm, setBannerForm] = useState({
+        title: '',
+        subtitle: '',
+        imageUrl: '',
+        linkType: 'none',
+        linkId: '',
+        order: 0,
+        isActive: true,
+    });
+    const [sectionForm, setSectionForm] = useState({
+        title: '',
+        type: 'horizontal',
+        filterType: 'latest',
+        categoryId: '',
+        order: 0,
+        isActive: true,
+    });
 
     useEffect(() => {
-        fetchData();
-        fetchCategories();
+        fetchLayout();
     }, []);
 
-    const fetchData = async () => {
+    const fetchLayout = async () => {
         try {
-            const { data } = await api.get('/layout/home');
-            setBanners(data.banners);
-            setSections(data.sections);
-        } catch (e) {
-            console.error("Failed to load layout", e);
+            const [settingsRes, bannersRes, sectionsRes, categoriesRes] = await Promise.all([
+                api.get('/layout/settings'),
+                api.get('/layout/banners'),
+                api.get('/layout/sections'),
+                api.get('/categories'),
+            ]);
+            setSettings(settingsRes.data);
+            setBanners(bannersRes.data);
+            setSections(sectionsRes.data);
+            setCategories(categoriesRes.data);
+        } catch (error) {
+            console.error(error);
+            alert('Failed to load home layout');
         } finally {
             setLoading(false);
         }
     };
 
-    const fetchCategories = async () => {
-        const { data } = await api.get('/categories');
-        setCategories(data);
-    };
-
-    const handleAddBanner = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!bannerImage) return alert("Image is required");
-        setSubmittingBanner(true);
+    const saveSettings = async () => {
+        setSaving(true);
         try {
-            // Upload Image
-            const uploadData = new FormData();
-            uploadData.append('image', bannerImage);
-            const uploadRes = await api.post('/upload', uploadData);
-            const imageUrl = uploadRes.data.url;
-
-            await api.post('/layout/banners', { ...bannerForm, imageUrl });
-            fetchData();
-            setBannerForm({ title: '', subtitle: '', order: 0 });
-            setBannerImage(null);
-        } catch {
-            alert('Failed to add banner');
+            const { data } = await api.put('/layout/settings', settings);
+            setSettings(data);
+        } catch (error) {
+            console.error(error);
+            alert('Failed to save home settings');
         } finally {
-            setSubmittingBanner(false);
+            setSaving(false);
         }
     };
 
-    const handleDeleteBanner = async (id: string) => {
+    const resetBannerForm = () => {
+        setEditingBannerId(null);
+        setBannerForm({ title: '', subtitle: '', imageUrl: '', linkType: 'none', linkId: '', order: 0, isActive: true });
+    };
+
+    const resetSectionForm = () => {
+        setEditingSectionId(null);
+        setSectionForm({ title: '', type: 'horizontal', filterType: 'latest', categoryId: '', order: 0, isActive: true });
+    };
+
+    const submitBanner = async (event: React.FormEvent) => {
+        event.preventDefault();
+        try {
+            const payload = {
+                ...bannerForm,
+                linkId: bannerForm.linkType === 'none' ? '' : bannerForm.linkId,
+                order: Number(bannerForm.order) || 0,
+            };
+            if (editingBannerId) {
+                await api.put(`/layout/banners/${editingBannerId}`, payload);
+            } else {
+                await api.post('/layout/banners', payload);
+            }
+            resetBannerForm();
+            await fetchLayout();
+        } catch (error) {
+            console.error(error);
+            alert('Failed to save banner');
+        }
+    };
+
+    const submitSection = async (event: React.FormEvent) => {
+        event.preventDefault();
+        try {
+            const payload = {
+                ...sectionForm,
+                order: Number(sectionForm.order) || 0,
+                categoryId: sectionForm.filterType === 'category' ? sectionForm.categoryId : undefined,
+            };
+            if (editingSectionId) {
+                await api.put(`/layout/sections/${editingSectionId}`, payload);
+            } else {
+                await api.post('/layout/sections', payload);
+            }
+            resetSectionForm();
+            await fetchLayout();
+        } catch (error) {
+            console.error(error);
+            alert('Failed to save section');
+        }
+    };
+
+    const deleteBanner = async (id: string) => {
         if (!confirm('Delete this banner?')) return;
-        try {
-            await api.delete(`/layout/banners/${id}`);
-            fetchData();
-        } catch { alert('Failed to delete'); }
+        await api.delete(`/layout/banners/${id}`);
+        setBanners(items => items.filter(item => item._id !== id));
     };
 
-    const handleAddSection = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setSubmittingSection(true);
-        try {
-            await api.post('/layout/sections', sectionForm);
-            fetchData();
-            setSectionForm({ title: '', type: 'horizontal', filterType: 'latest', categoryId: '', order: 0 });
-        } catch {
-            alert('Failed to add section');
-        } finally {
-            setSubmittingSection(false);
-        }
-    };
-
-    const handleDeleteSection = async (id: string) => {
+    const deleteSection = async (id: string) => {
         if (!confirm('Delete this section?')) return;
-        try {
-            await api.delete(`/layout/sections/${id}`);
-            fetchData();
-        } catch { alert('Failed to delete'); }
+        await api.delete(`/layout/sections/${id}`);
+        setSections(items => items.filter(item => item._id !== id));
     };
 
-    if (loading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin" /></div>;
+    const toggleBanner = async (banner: Banner) => {
+        const { data } = await api.put(`/layout/banners/${banner._id}`, {
+            isActive: !banner.isActive,
+        });
+        setBanners(items => items.map(item => item._id === banner._id ? data : item));
+    };
+
+    const toggleSection = async (section: HomeSection) => {
+        const { data } = await api.put(`/layout/sections/${section._id}`, {
+            isActive: !section.isActive,
+        });
+        setSections(items => items.map(item => item._id === section._id ? data : item));
+    };
+
+    const editBanner = (banner: Banner) => {
+        setEditingBannerId(banner._id);
+        setBannerForm({
+            title: banner.title,
+            subtitle: banner.subtitle ?? '',
+            imageUrl: banner.imageUrl,
+            linkType: banner.linkType,
+            linkId: banner.linkId ?? '',
+            order: banner.order,
+            isActive: banner.isActive,
+        });
+    };
+
+    const editSection = (section: HomeSection) => {
+        setEditingSectionId(section._id);
+        setSectionForm({
+            title: section.title,
+            type: section.type,
+            filterType: section.filterType,
+            categoryId: section.categoryId ?? '',
+            order: section.order,
+            isActive: section.isActive,
+        });
+    };
+
+    if (loading) {
+        return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
+    }
 
     return (
-        <div className="max-w-5xl mx-auto space-y-10 pb-20">
-            <div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Home Page Layout</h2>
-                <p className="text-gray-500 text-sm">Customize the banners and sections of your mobile app home screen.</p>
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Home Layout</h2>
+                    <p className="text-sm text-gray-500 mt-1">Control the customer app home page from here.</p>
+                </div>
+                <button
+                    onClick={saveSettings}
+                    disabled={saving}
+                    className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-60"
+                >
+                    {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                    Save Settings
+                </button>
             </div>
 
-            {/* Banners Section */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                    <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                        <ImageIcon size={20} className="text-blue-600" /> Hero Banners
-                    </h3>
+            <section className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
+                <div className="flex items-center gap-2 mb-4">
+                    <LayoutPanelTop size={20} className="text-blue-600" />
+                    <h3 className="font-bold text-gray-900">Mobile Home Text</h3>
                 </div>
-
-                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* List */}
-                    <div className="space-y-4 order-2 md:order-1">
-                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Active Banners</h4>
-                        {banners.length === 0 ? <p className="text-sm text-gray-400 italic">No banners active.</p> : banners.map((banner: Banner) => (
-                            <div key={banner._id} className="flex gap-4 p-3 border rounded-xl bg-gray-50 hover:bg-white hover:shadow-md transition group">
-                                <div className="w-20 h-12 relative rounded-lg overflow-hidden flex-shrink-0 bg-gray-200">
-                                    <Image src={banner.imageUrl} alt="Banner" fill className="object-cover" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-semibold text-sm truncate">{banner.title}</p>
-                                    <p className="text-xs text-gray-500 truncate">{banner.subtitle || 'No subtitle'}</p>
-                                </div>
-                                <button onClick={() => handleDeleteBanner(banner._id)} className="text-gray-400 hover:text-red-500 p-1">
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
-                        ))}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <TextInput label="Header title" value={settings.headerTitle} onChange={value => setSettings({ ...settings, headerTitle: value })} />
+                    <TextInput label="Search placeholder" value={settings.searchPlaceholder} onChange={value => setSettings({ ...settings, searchPlaceholder: value })} />
+                    <TextInput label="Category title" value={settings.categoryTitle} onChange={value => setSettings({ ...settings, categoryTitle: value })} />
+                    <TextInput label="Explore title" value={settings.exploreTitle} onChange={value => setSettings({ ...settings, exploreTitle: value })} />
+                    <div className="md:col-span-2">
+                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Header subtitle</label>
+                        <textarea
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 min-h-20"
+                            value={settings.headerSubtitle}
+                            onChange={event => setSettings({ ...settings, headerSubtitle: event.target.value })}
+                        />
                     </div>
-
-                    {/* Form */}
-                    <form onSubmit={handleAddBanner} className="space-y-4 p-5 bg-blue-50/50 rounded-xl border border-blue-100 order-1 md:order-2">
-                        <h4 className="text-xs font-semibold text-blue-800 uppercase tracking-wide">Add New Banner</h4>
-                        <div>
-                            <input
-                                required placeholder="Title (e.g. Flash Sale)"
-                                className="w-full px-3 py-2 rounded-lg text-sm border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                value={bannerForm.title} onChange={e => setBannerForm({ ...bannerForm, title: e.target.value })}
-                            />
-                        </div>
-                        <div>
-                            <input
-                                placeholder="Subtitle (e.g. Up to 50% Off)"
-                                className="w-full px-3 py-2 rounded-lg text-sm border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                value={bannerForm.subtitle} onChange={e => setBannerForm({ ...bannerForm, subtitle: e.target.value })}
-                            />
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <label className="flex-1 cursor-pointer bg-white px-3 py-2 rounded-lg border border-dashed border-blue-300 text-blue-600 text-sm font-medium hover:bg-blue-50 transition flex items-center justify-center gap-2">
-                                <UploadCloud size={16} /> {bannerImage ? 'Image Selected' : 'Upload Image'}
-                                <input type="file" required accept="image/*" className="hidden" onChange={e => setBannerImage(e.target.files?.[0] || null)} />
-                            </label>
-                            <button disabled={submittingBanner} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-                                {submittingBanner ? <Loader2 className="animate-spin w-4 h-4" /> : <Plus size={18} />}
-                            </button>
-                        </div>
-                    </form>
                 </div>
-            </div>
-
-            {/* Sections */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                    <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                        <Layout size={20} className="text-purple-600" /> Content Sections
-                    </h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4">
+                    <Toggle label="Show banners" checked={settings.showBanners} onChange={value => setSettings({ ...settings, showBanners: value })} />
+                    <Toggle label="Show categories" checked={settings.showCategories} onChange={value => setSettings({ ...settings, showCategories: value })} />
+                    <Toggle label="Show sections" checked={settings.showDynamicSections} onChange={value => setSettings({ ...settings, showDynamicSections: value })} />
+                    <Toggle label="Show explore grid" checked={settings.showExploreProducts} onChange={value => setSettings({ ...settings, showExploreProducts: value })} />
                 </div>
+            </section>
 
-                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* List */}
-                    <div className="space-y-4 order-2 md:order-1">
-                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Active Sections</h4>
-                        {sections.length === 0 ? <p className="text-sm text-gray-400 italic">No sections added.</p> : sections.map((section: HomeSection) => (
-                            <div key={section._id} className="flex gap-4 p-3 border rounded-xl bg-gray-50 hover:bg-white hover:shadow-md transition items-center">
-                                <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-xs">
-                                    {section.type === 'grid' ? 'GRID' : 'LIST'}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-semibold text-sm truncate">{section.title}</p>
-                                    <p className="text-xs text-gray-500 truncate capitalize">{section.filterType} {section.categoryName ? `(${section.categoryName})` : ''}</p>
-                                </div>
-                                <button onClick={() => handleDeleteSection(section._id)} className="text-gray-400 hover:text-red-500 p-1">
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
-                        ))}
+            <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                        <ImagePlus size={20} className="text-orange-500" />
+                        <h3 className="font-bold text-gray-900">Banners</h3>
                     </div>
-
-                    {/* Form */}
-                    <form onSubmit={handleAddSection} className="space-y-4 p-5 bg-purple-50/50 rounded-xl border border-purple-100 order-1 md:order-2">
-                        <h4 className="text-xs font-semibold text-purple-800 uppercase tracking-wide">Add New Section</h4>
-                        <div>
-                            <input
-                                required placeholder="Section Title (e.g. New Arrivals)"
-                                className="w-full px-3 py-2 rounded-lg text-sm border border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-                                value={sectionForm.title} onChange={e => setSectionForm({ ...sectionForm, title: e.target.value })}
-                            />
+                    <form onSubmit={submitBanner} className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+                        <TextInput label="Title" value={bannerForm.title} onChange={value => setBannerForm({ ...bannerForm, title: value })} required />
+                        <TextInput label="Subtitle" value={bannerForm.subtitle} onChange={value => setBannerForm({ ...bannerForm, subtitle: value })} />
+                        <div className="md:col-span-2">
+                            <TextInput label="Image URL" value={bannerForm.imageUrl} onChange={value => setBannerForm({ ...bannerForm, imageUrl: value })} required />
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <select
-                                className="w-full px-3 py-2 rounded-lg text-sm border border-purple-200 focus:outline-none bg-white"
-                                value={sectionForm.type} onChange={e => setSectionForm({ ...sectionForm, type: e.target.value })}
-                            >
-                                <option value="horizontal">Horizontal List</option>
-                                <option value="grid">Grid View</option>
-                            </select>
-                            <select
-                                className="w-full px-3 py-2 rounded-lg text-sm border border-purple-200 focus:outline-none bg-white"
-                                value={sectionForm.filterType} onChange={e => setSectionForm({ ...sectionForm, filterType: e.target.value })}
-                            >
-                                <option value="latest">Latest Products</option>
-                                <option value="featured">Featured Products</option>
-                                <option value="category">Specific Category</option>
-                            </select>
-                        </div>
-
-                        {sectionForm.filterType === 'category' && (
-                            <select
-                                required
-                                className="w-full px-3 py-2 rounded-lg text-sm border border-purple-200 focus:outline-none bg-white"
-                                value={sectionForm.categoryId} onChange={e => setSectionForm({ ...sectionForm, categoryId: e.target.value })}
-                            >
-                                <option value="">Select Category</option>
-                                {categories.map((c: Category) => <option key={c._id} value={c._id}>{c.name}</option>)}
-                            </select>
+                        <SelectInput label="Tap action" value={bannerForm.linkType} onChange={value => setBannerForm({ ...bannerForm, linkType: value, linkId: '' })} options={[
+                            { value: 'none', label: 'No action' },
+                            { value: 'category', label: 'Open category' },
+                            { value: 'product', label: 'Open product by ID' },
+                        ]} />
+                        {bannerForm.linkType === 'category' && (
+                            <SelectInput label="Target category" value={bannerForm.linkId} onChange={value => setBannerForm({ ...bannerForm, linkId: value })} options={[
+                                { value: '', label: 'Choose category' },
+                                ...categories.map(category => ({ value: category._id, label: category.name })),
+                            ]} />
                         )}
-
-                        <button disabled={submittingSection} className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50 flex justify-center">
-                            {submittingSection ? <Loader2 className="animate-spin w-4 h-4" /> : 'Add Section'}
-                        </button>
+                        {bannerForm.linkType === 'product' && (
+                            <TextInput
+                                label="Target product ID"
+                                value={bannerForm.linkId}
+                                onChange={value => setBannerForm({ ...bannerForm, linkId: value })}
+                            />
+                        )}
+                        <TextInput label="Order" type="number" value={String(bannerForm.order)} onChange={value => setBannerForm({ ...bannerForm, order: Number(value) })} />
+                        <Toggle label="Active" checked={bannerForm.isActive} onChange={value => setBannerForm({ ...bannerForm, isActive: value })} />
+                        <div className="md:col-span-2 flex gap-2">
+                            <button className="flex-1 inline-flex items-center justify-center gap-2 bg-gray-900 text-white rounded-lg py-2 text-sm font-semibold">
+                                {editingBannerId ? <Save size={16} /> : <Plus size={16} />}
+                                {editingBannerId ? 'Update Banner' : 'Add Banner'}
+                            </button>
+                            {editingBannerId && (
+                                <button
+                                    type="button"
+                                    onClick={resetBannerForm}
+                                    className="inline-flex items-center justify-center gap-2 border border-gray-200 px-3 rounded-lg text-sm font-semibold text-gray-600"
+                                >
+                                    <X size={16} /> Cancel
+                                </button>
+                            )}
+                        </div>
                     </form>
+                    <ItemList items={banners.map(item => ({
+                        id: item._id,
+                        title: item.title,
+                        subtitle: `${item.isActive ? 'Active' : 'Hidden'} • Order ${item.order}`,
+                        imageUrl: item.imageUrl,
+                        isActive: item.isActive,
+                        raw: item,
+                    }))} onDelete={deleteBanner} onToggle={(item) => toggleBanner(item.raw as Banner)} onEdit={(item) => editBanner(item.raw as Banner)} />
                 </div>
-            </div>
+
+                <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                        <LayoutPanelTop size={20} className="text-green-600" />
+                        <h3 className="font-bold text-gray-900">Product Sections</h3>
+                    </div>
+                    <form onSubmit={submitSection} className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+                        <TextInput label="Title" value={sectionForm.title} onChange={value => setSectionForm({ ...sectionForm, title: value })} required />
+                        <SelectInput label="Layout" value={sectionForm.type} onChange={value => setSectionForm({ ...sectionForm, type: value })} options={[
+                            { value: 'horizontal', label: 'Horizontal carousel' },
+                            { value: 'grid', label: 'Grid' },
+                        ]} />
+                        <SelectInput label="Product filter" value={sectionForm.filterType} onChange={value => setSectionForm({ ...sectionForm, filterType: value })} options={[
+                            { value: 'latest', label: 'Latest products' },
+                            { value: 'featured', label: 'Featured products' },
+                            { value: 'category', label: 'Specific category' },
+                        ]} />
+                        <TextInput label="Order" type="number" value={String(sectionForm.order)} onChange={value => setSectionForm({ ...sectionForm, order: Number(value) })} />
+                        {sectionForm.filterType === 'category' && (
+                            <SelectInput label="Category" value={sectionForm.categoryId} onChange={value => setSectionForm({ ...sectionForm, categoryId: value })} options={[
+                                { value: '', label: 'Choose category' },
+                                ...categories.map(category => ({ value: category._id, label: category.name })),
+                            ]} />
+                        )}
+                        <Toggle label="Active" checked={sectionForm.isActive} onChange={value => setSectionForm({ ...sectionForm, isActive: value })} />
+                        <div className="md:col-span-2 flex gap-2">
+                            <button className="flex-1 inline-flex items-center justify-center gap-2 bg-gray-900 text-white rounded-lg py-2 text-sm font-semibold">
+                                {editingSectionId ? <Save size={16} /> : <Plus size={16} />}
+                                {editingSectionId ? 'Update Section' : 'Add Section'}
+                            </button>
+                            {editingSectionId && (
+                                <button
+                                    type="button"
+                                    onClick={resetSectionForm}
+                                    className="inline-flex items-center justify-center gap-2 border border-gray-200 px-3 rounded-lg text-sm font-semibold text-gray-600"
+                                >
+                                    <X size={16} /> Cancel
+                                </button>
+                            )}
+                        </div>
+                    </form>
+                    <ItemList items={sections.map(item => ({
+                        id: item._id,
+                        title: item.title,
+                        subtitle: `${item.type} • ${item.filterType} • ${item.isActive ? 'Active' : 'Hidden'} • Order ${item.order}`,
+                        isActive: item.isActive,
+                        raw: item,
+                    }))} onDelete={deleteSection} onToggle={(item) => toggleSection(item.raw as HomeSection)} onEdit={(item) => editSection(item.raw as HomeSection)} />
+                </div>
+            </section>
+        </div>
+    );
+}
+
+function TextInput({ label, value, onChange, type = 'text', required = false }: {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    type?: string;
+    required?: boolean;
+}) {
+    return (
+        <label className="block">
+            <span className="block text-xs font-semibold text-gray-500 uppercase mb-1">{label}</span>
+            <input
+                required={required}
+                type={type}
+                value={value}
+                onChange={event => onChange(event.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800"
+            />
+        </label>
+    );
+}
+
+function SelectInput({ label, value, onChange, options }: {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    options: { value: string; label: string }[];
+}) {
+    return (
+        <label className="block">
+            <span className="block text-xs font-semibold text-gray-500 uppercase mb-1">{label}</span>
+            <select
+                value={value}
+                onChange={event => onChange(event.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white"
+            >
+                {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+        </label>
+    );
+}
+
+function Toggle({ label, checked, onChange }: {
+    label: string;
+    checked: boolean;
+    onChange: (value: boolean) => void;
+}) {
+    return (
+        <label className="flex items-center justify-between gap-3 border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+            <span>{label}</span>
+            <input
+                type="checkbox"
+                checked={checked}
+                onChange={event => onChange(event.target.checked)}
+                className="h-4 w-4 accent-blue-600"
+            />
+        </label>
+    );
+}
+
+function ItemList({ items, onDelete, onToggle, onEdit }: {
+    items: { id: string; title: string; subtitle: string; imageUrl?: string; isActive?: boolean; raw?: unknown }[];
+    onDelete: (id: string) => void;
+    onToggle?: (item: { id: string; title: string; subtitle: string; imageUrl?: string; isActive?: boolean; raw?: unknown }) => void;
+    onEdit?: (item: { id: string; title: string; subtitle: string; imageUrl?: string; isActive?: boolean; raw?: unknown }) => void;
+}) {
+    if (items.length === 0) {
+        return <div className="text-sm text-gray-500 border border-dashed rounded-lg p-6 text-center">No items yet.</div>;
+    }
+
+    return (
+        <div className="space-y-2">
+            {items.map(item => (
+                <div key={item.id} className="flex items-center gap-3 border border-gray-100 rounded-lg p-3">
+                    {item.imageUrl && (
+                        <div className="relative h-12 w-14 shrink-0 overflow-hidden rounded-md bg-gray-100">
+                            <Image src={item.imageUrl} alt="" fill sizes="56px" className="object-cover" />
+                        </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-gray-900 truncate">{item.title}</p>
+                        <p className="text-xs text-gray-500 truncate">{item.subtitle}</p>
+                    </div>
+                    {onToggle && (
+                        <button
+                            onClick={() => onToggle(item)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${item.isActive
+                                ? 'bg-green-50 text-green-700 hover:bg-green-100'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                }`}
+                        >
+                            {item.isActive ? 'Hide' : 'Show'}
+                        </button>
+                    )}
+                    {onEdit && (
+                        <button
+                            onClick={() => onEdit(item)}
+                            className="p-2 rounded-lg text-blue-600 hover:bg-blue-50"
+                        >
+                            <Edit size={16} />
+                        </button>
+                    )}
+                    <button
+                        onClick={() => onDelete(item.id)}
+                        className="p-2 rounded-lg text-red-500 hover:bg-red-50"
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                </div>
+            ))}
         </div>
     );
 }
