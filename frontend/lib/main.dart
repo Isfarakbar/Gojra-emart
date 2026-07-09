@@ -11,6 +11,7 @@ import 'providers/cart_provider.dart';
 import 'providers/wishlist_provider.dart';
 import 'providers/home_provider.dart';
 import 'providers/store_settings_provider.dart';
+import 'services/app_navigation.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,6 +36,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => StoreSettingsProvider()),
       ],
       child: MaterialApp(
+        navigatorKey: AppNavigation.navigatorKey,
         title: 'Gojra E-Mart',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,

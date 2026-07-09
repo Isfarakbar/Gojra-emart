@@ -8,7 +8,9 @@ import '../services/api_service.dart';
 import '../utils/helpers.dart';
 
 class HelpSupportScreen extends StatefulWidget {
-  const HelpSupportScreen({super.key});
+  final ApiService? apiService;
+
+  const HelpSupportScreen({super.key, this.apiService});
 
   @override
   State<HelpSupportScreen> createState() => _HelpSupportScreenState();
@@ -18,7 +20,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
   final _formKey = GlobalKey<FormState>();
   final _subjectController = TextEditingController();
   final _messageController = TextEditingController();
-  final _apiService = ApiService();
+  late final ApiService _apiService;
 
   bool _isLoading = true;
   bool _isSubmitting = false;
@@ -26,6 +28,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
   String? _selectedOrderId;
   List<dynamic> _orders = [];
   List<dynamic> _tickets = [];
+  String? _loadError;
 
   final List<Map<String, String>> _categories = const [
     {'value': 'order_issue', 'label': 'Order issue'},
@@ -39,8 +42,12 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
   @override
   void initState() {
     super.initState();
+    _apiService = widget.apiService ?? ApiService();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<StoreSettingsProvider>(context, listen: false).fetchSettings();
+      Provider.of<StoreSettingsProvider>(
+        context,
+        listen: false,
+      ).fetchSettings();
     });
     _loadSupportData();
   }
@@ -53,7 +60,10 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
   }
 
   Future<void> _loadSupportData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
     try {
       final responses = await Future.wait([
         _apiService.dio.get('/orders/myorders'),
@@ -61,13 +71,24 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
       ]);
 
       if (!mounted) return;
+      final ordersData = responses[0].data;
       final ticketsData = responses[1].data;
       setState(() {
-        _orders = responses[0].data is List ? responses[0].data : [];
-        _tickets = ticketsData is List ? ticketsData : (ticketsData['tickets'] ?? []);
+        _orders = ordersData is List
+            ? ordersData
+            : (ordersData is Map ? ordersData['orders'] ?? [] : []);
+        _tickets = ticketsData is List
+            ? ticketsData
+            : (ticketsData['tickets'] ?? []);
       });
     } catch (error) {
       debugPrint('Failed to load support data: $error');
+      if (mounted) {
+        setState(() {
+          _loadError =
+              'Could not load your support history. You can retry without losing this form.';
+        });
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -78,12 +99,15 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
     setState(() => _isSubmitting = true);
     try {
-      await _apiService.dio.post('/support', data: {
-        'subject': _subjectController.text.trim(),
-        'message': _messageController.text.trim(),
-        'category': _category,
-        if (_selectedOrderId != null) 'order': _selectedOrderId,
-      });
+      await _apiService.dio.post(
+        '/support',
+        data: {
+          'subject': _subjectController.text.trim(),
+          'message': _messageController.text.trim(),
+          'category': _category,
+          if (_selectedOrderId != null) 'order': _selectedOrderId,
+        },
+      );
 
       _subjectController.clear();
       _messageController.clear();
@@ -120,7 +144,10 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
       appBar: AppBar(
         title: Text(
           'Help & Support',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.black),
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
         ),
         centerTitle: true,
         backgroundColor: Colors.white,
@@ -138,6 +165,27 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (_loadError != null)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.cloud_off_outlined, color: Colors.red),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(_loadError!)),
+                      TextButton(
+                        onPressed: _loadSupportData,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
               _buildHeader(),
               const SizedBox(height: 20),
               _buildTicketForm(),
@@ -169,12 +217,19 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
           const SizedBox(height: 14),
           Text(
             'How can we help?',
-            style: GoogleFonts.poppins(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             'Report an order issue, ask a question, or contact our team directly.',
-            style: GoogleFonts.inter(color: Colors.white.withValues(alpha: 0.86), height: 1.4),
+            style: GoogleFonts.inter(
+              color: Colors.white.withValues(alpha: 0.86),
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -196,7 +251,8 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                   child: Text(category['label']!, style: GoogleFonts.inter()),
                 );
               }).toList(),
-              onChanged: (value) => setState(() => _category = value ?? 'other'),
+              onChanged: (value) =>
+                  setState(() => _category = value ?? 'other'),
               decoration: _inputDecoration('Issue type'),
             ),
             const SizedBox(height: 12),
@@ -254,13 +310,22 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
               child: ElevatedButton.icon(
                 onPressed: _isSubmitting ? null : _submitTicket,
                 icon: _isSubmitting
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
                     : const Icon(Icons.send_rounded),
                 label: Text(_isSubmitting ? 'Submitting...' : 'Submit Request'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2E7D32),
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                   textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w700),
                 ),
               ),
@@ -279,25 +344,39 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
           _buildContactOption(
             icon: Icons.headset_mic,
             title: 'Customer Service',
-            subtitle: settings.supportPhone.isEmpty ? 'Phone support not configured' : settings.supportPhone,
+            subtitle: settings.supportPhone.isEmpty
+                ? 'Phone support not configured'
+                : settings.supportPhone,
             color: Colors.blue,
-            onTap: settings.supportPhone.isEmpty ? () {} : () => _launchSupportUrl('tel:${settings.supportPhone}'),
+            onTap: settings.supportPhone.isEmpty
+                ? () {}
+                : () => _launchSupportUrl('tel:${settings.supportPhone}'),
           ),
           const SizedBox(height: 10),
           _buildContactOption(
             icon: Icons.email,
             title: 'Email Support',
-            subtitle: settings.supportEmail.isEmpty ? 'Email support not configured' : settings.supportEmail,
+            subtitle: settings.supportEmail.isEmpty
+                ? 'Email support not configured'
+                : settings.supportEmail,
             color: Colors.orange,
-            onTap: settings.supportEmail.isEmpty ? () {} : () => _launchSupportUrl('mailto:${settings.supportEmail}'),
+            onTap: settings.supportEmail.isEmpty
+                ? () {}
+                : () => _launchSupportUrl('mailto:${settings.supportEmail}'),
           ),
           const SizedBox(height: 10),
           _buildContactOption(
             icon: Icons.chat,
             title: 'WhatsApp',
-            subtitle: settings.supportWhatsapp.isEmpty ? 'WhatsApp support not configured' : 'Chat with us now',
+            subtitle: settings.supportWhatsapp.isEmpty
+                ? 'WhatsApp support not configured'
+                : 'Chat with us now',
             color: Colors.green,
-            onTap: settings.supportWhatsapp.isEmpty ? () {} : () => _launchSupportUrl('https://wa.me/${settings.supportWhatsapp}'),
+            onTap: settings.supportWhatsapp.isEmpty
+                ? () {}
+                : () => _launchSupportUrl(
+                    'https://wa.me/${settings.supportWhatsapp}',
+                  ),
           ),
         ],
       ),
@@ -308,15 +387,26 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     return _sectionCard(
       title: 'Your requests',
       child: _isLoading
-          ? const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(),
+              ),
+            )
           : _tickets.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Text('No support requests yet.', style: GoogleFonts.inter(color: Colors.grey[600])),
-                )
-              : Column(
-                  children: _tickets.take(5).map((ticket) => _buildTicketTile(ticket)).toList(),
-                ),
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'No support requests yet.',
+                style: GoogleFonts.inter(color: Colors.grey[600]),
+              ),
+            )
+          : Column(
+              children: _tickets
+                  .take(5)
+                  .map((ticket) => _buildTicketTile(ticket))
+                  .toList(),
+            ),
     );
   }
 
@@ -338,7 +428,10 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
               Expanded(
                 child: Text(
                   ticket['subject'] ?? 'Support request',
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 14),
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
                 ),
               ),
               _statusBadge(status),
@@ -349,7 +442,11 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
             ticket['message'] ?? '',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.inter(color: Colors.grey[700], fontSize: 13, height: 1.35),
+            style: GoogleFonts.inter(
+              color: Colors.grey[700],
+              fontSize: 13,
+              height: 1.35,
+            ),
           ),
           if ((ticket['adminReply'] ?? '').toString().isNotEmpty) ...[
             const SizedBox(height: 10),
@@ -362,7 +459,11 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
               ),
               child: Text(
                 ticket['adminReply'],
-                style: GoogleFonts.inter(color: const Color(0xFF1B5E20), fontSize: 13, height: 1.35),
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF1B5E20),
+                  fontSize: 13,
+                  height: 1.35,
+                ),
               ),
             ),
           ],
@@ -376,10 +477,22 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
       title: 'Frequently asked questions',
       child: Column(
         children: [
-          _buildExpansionTile('How do I track my order?', 'You can track your order status in the My Orders section of the app.'),
-          _buildExpansionTile('What payment methods do you accept?', 'We currently accept Cash on Delivery only.'),
-          _buildExpansionTile('How can I return an item?', 'Submit a support request within 24 hours of delivery and include the order number.'),
-          _buildExpansionTile('Do you deliver to my area?', 'You can place orders from any location. Add a clear address and allow location access at checkout.'),
+          _buildExpansionTile(
+            'How do I track my order?',
+            'You can track your order status in the My Orders section of the app.',
+          ),
+          _buildExpansionTile(
+            'What payment methods do you accept?',
+            'We currently accept Cash on Delivery only.',
+          ),
+          _buildExpansionTile(
+            'How can I return an item?',
+            'Submit a support request within 24 hours of delivery and include the order number.',
+          ),
+          _buildExpansionTile(
+            'Do you deliver to my area?',
+            'You can place orders from any location. Add a clear address and allow location access at checkout.',
+          ),
         ],
       ),
     );
@@ -403,7 +516,13 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(
+            title,
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
           const SizedBox(height: 14),
           child,
         ],
@@ -432,7 +551,10 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
               child: Icon(icon, color: color),
             ),
             const SizedBox(width: 14),
@@ -440,8 +562,17 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-                  Text(subtitle, style: GoogleFonts.inter(color: Colors.grey[600], fontSize: 12)),
+                  Text(
+                    title,
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.inter(
+                      color: Colors.grey[600],
+                      fontSize: 12,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -461,11 +592,21 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
       ),
       child: ExpansionTile(
         tilePadding: const EdgeInsets.symmetric(horizontal: 14),
-        title: Text(title, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
+        title: Text(
+          title,
+          style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
+        ),
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-            child: Text(content, style: GoogleFonts.inter(color: Colors.grey[600], fontSize: 13, height: 1.5)),
+            child: Text(
+              content,
+              style: GoogleFonts.inter(
+                color: Colors.grey[600],
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
           ),
         ],
       ),
@@ -476,17 +617,24 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     final color = status == 'Resolved'
         ? Colors.green
         : status == 'In Progress'
-            ? Colors.blue
-            : status == 'Closed'
-                ? Colors.grey
-                : Colors.orange;
+        ? Colors.blue
+        : status == 'Closed'
+        ? Colors.grey
+        : Colors.orange;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
       ),
-      child: Text(status, style: GoogleFonts.inter(color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+      child: Text(
+        status,
+        style: GoogleFonts.inter(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 
@@ -496,9 +644,18 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
       labelStyle: GoogleFonts.inter(color: Colors.grey[600]),
       filled: true,
       fillColor: Colors.grey[50],
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey[200]!)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey[200]!)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 1.4)),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: Colors.grey[200]!),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: Colors.grey[200]!),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 1.4),
+      ),
     );
   }
 }

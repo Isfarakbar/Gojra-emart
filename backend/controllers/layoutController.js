@@ -85,7 +85,7 @@ const deleteBanner = async (req, res) => {
 
 const updateBanner = async (req, res) => {
     try {
-        const banner = await Banner.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        const banner = await Banner.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after', runValidators: true });
         if (!banner) {
             return res.status(404).json({ message: 'Banner not found' });
         }
@@ -126,7 +126,7 @@ const updateSection = async (req, res) => {
             delete update.$set.categoryId;
             update.$unset = { categoryId: 1 };
         }
-        const section = await HomeSection.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
+        const section = await HomeSection.findByIdAndUpdate(req.params.id, update, { returnDocument: 'after', runValidators: true });
         if (!section) {
             return res.status(404).json({ message: 'Section not found' });
         }

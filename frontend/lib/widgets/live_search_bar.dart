@@ -20,7 +20,8 @@ class LiveSearchBar extends StatefulWidget {
   State<LiveSearchBar> createState() => _LiveSearchBarState();
 }
 
-class _LiveSearchBarState extends State<LiveSearchBar> with SingleTickerProviderStateMixin {
+class _LiveSearchBarState extends State<LiveSearchBar>
+    with SingleTickerProviderStateMixin {
   final FocusNode _focusNode = FocusNode();
   final TextEditingController _controller = TextEditingController();
   final LayerLink _layerLink = LayerLink();
@@ -73,7 +74,7 @@ class _LiveSearchBarState extends State<LiveSearchBar> with SingleTickerProvider
 
   void _onSearchChanged(String text) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    
+
     if (text.trim().length < 2) {
       setState(() {
         _suggestions = [];
@@ -89,7 +90,10 @@ class _LiveSearchBarState extends State<LiveSearchBar> with SingleTickerProvider
     _showOverlay();
 
     _debounce = Timer(const Duration(milliseconds: 300), () async {
-      final productProvider = Provider.of<ProductProvider>(context, listen: false);
+      final productProvider = Provider.of<ProductProvider>(
+        context,
+        listen: false,
+      );
       final results = await productProvider.getSearchSuggestions(text);
       if (mounted) {
         setState(() {
@@ -128,17 +132,22 @@ class _LiveSearchBarState extends State<LiveSearchBar> with SingleTickerProvider
     // Hide overlay and unfocus before navigation
     _hideOverlay();
     _focusNode.unfocus();
-    
+
     // Show premium accent loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator(color: Color(0xFFFF6F00))),
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFFFF6F00)),
+      ),
     );
 
-    final productProvider = Provider.of<ProductProvider>(context, listen: false);
+    final productProvider = Provider.of<ProductProvider>(
+      context,
+      listen: false,
+    );
     final fullProduct = await productProvider.getProductById(productId);
-    
+
     if (mounted) {
       Navigator.of(context).pop(); // Dismiss loading
       if (fullProduct != null) {
@@ -156,9 +165,7 @@ class _LiveSearchBarState extends State<LiveSearchBar> with SingleTickerProvider
     _hideOverlay();
     _focusNode.unfocus();
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => SearchScreen(initialQuery: query),
-      ),
+      MaterialPageRoute(builder: (_) => SearchScreen(initialQuery: query)),
     );
   }
 
@@ -236,15 +243,19 @@ class _LiveSearchBarState extends State<LiveSearchBar> with SingleTickerProvider
       padding: EdgeInsets.zero,
       shrinkWrap: true,
       itemCount: _suggestions.length > 6 ? 6 : _suggestions.length,
-      separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFEEEEEE)),
+      separatorBuilder: (context, index) =>
+          const Divider(height: 1, color: Color(0xFFEEEEEE)),
       itemBuilder: (context, index) {
         final suggestion = _suggestions[index];
         final String name = suggestion['name'] ?? '';
         final String query = _controller.text.trim();
-        final double price = (suggestion['variants'] != null && suggestion['variants'].isNotEmpty)
+        final double price =
+            (suggestion['variants'] != null &&
+                suggestion['variants'].isNotEmpty)
             ? (suggestion['variants'][0]['price'] as num).toDouble()
             : 0.0;
-        final String imageUrl = (suggestion['images'] != null && suggestion['images'].isNotEmpty)
+        final String imageUrl =
+            (suggestion['images'] != null && suggestion['images'].isNotEmpty)
             ? suggestion['images'][0]
             : '';
 
@@ -262,17 +273,26 @@ class _LiveSearchBarState extends State<LiveSearchBar> with SingleTickerProvider
                           width: 40,
                           height: 40,
                           fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(color: Colors.grey[100]),
+                          placeholder: (context, url) =>
+                              Container(color: Colors.grey[100]),
                           errorWidget: (context, url, error) => Container(
                             color: Colors.grey[100],
-                            child: const Icon(Icons.image, size: 20, color: Colors.grey),
+                            child: const Icon(
+                              Icons.image,
+                              size: 20,
+                              color: Colors.grey,
+                            ),
                           ),
                         )
                       : Container(
                           width: 40,
                           height: 40,
                           color: Colors.grey[100],
-                          child: const Icon(Icons.image, size: 20, color: Colors.grey),
+                          child: const Icon(
+                            Icons.image,
+                            size: 20,
+                            color: Colors.grey,
+                          ),
                         ),
                 ),
                 const SizedBox(width: 12),
@@ -338,7 +358,10 @@ class _LiveSearchBarState extends State<LiveSearchBar> with SingleTickerProvider
         TextSpan(text: name.substring(0, matchIndex)),
         TextSpan(
           text: name.substring(matchIndex, matchIndex + query.length),
-          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
         ),
         TextSpan(text: name.substring(matchIndex + query.length)),
       ],
@@ -358,7 +381,14 @@ class _LiveSearchBarState extends State<LiveSearchBar> with SingleTickerProvider
             highlightColor: Colors.grey[100]!,
             child: Row(
               children: [
-                Container(width: 40, height: 40, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8))),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -390,83 +420,97 @@ class _LiveSearchBarState extends State<LiveSearchBar> with SingleTickerProvider
           return SizedBox(
             height: 52,
             child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isFocused ? const Color(0xFF2E7D32) : Colors.transparent,
-                width: 1.5,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isFocused
+                      ? const Color(0xFF2E7D32)
+                      : Colors.transparent,
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                )
-              ],
-            ),
-            child: Row(
-              children: [
-                const Padding(
-                  padding: EdgeInsets.only(left: 14, right: 10),
-                  child: Icon(Icons.search_rounded, color: Color(0xFF7B8190), size: 22),
-                ),
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    focusNode: _focusNode,
-                    onChanged: _onSearchChanged,
-                    onSubmitted: _onSubmitted,
-                    textInputAction: TextInputAction.search,
-                    decoration: InputDecoration(
-                      hintText: widget.placeholder,
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 15),
-                      hintStyle: GoogleFonts.poppins(
-                        color: const Color(0xFF8A90A0),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
+              child: Row(
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(left: 14, right: 10),
+                    child: Icon(
+                      Icons.search_rounded,
+                      color: Color(0xFF7B8190),
+                      size: 22,
+                    ),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      onChanged: _onSearchChanged,
+                      onSubmitted: _onSubmitted,
+                      textInputAction: TextInputAction.search,
+                      decoration: InputDecoration(
+                        hintText: widget.placeholder,
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 15,
+                        ),
+                        hintStyle: GoogleFonts.poppins(
+                          color: const Color(0xFF8A90A0),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: Colors.black87,
                       ),
                     ),
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: Colors.black87,
-                    ),
                   ),
-                ),
-                if (_controller.text.isNotEmpty)
-                  IconButton(
-                    tooltip: 'Clear',
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(Icons.close_rounded, color: Color(0xFF8A90A0), size: 18),
-                    onPressed: () {
-                      setState(() {
-                        _controller.clear();
-                        _suggestions = [];
-                      });
-                      _hideOverlay();
-                    },
-                  ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: IconButton(
-                      tooltip: 'Search',
-                      style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFFFF6F00),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  if (_controller.text.isNotEmpty)
+                    IconButton(
+                      tooltip: 'Clear',
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Color(0xFF8A90A0),
+                        size: 18,
                       ),
-                      icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                      onPressed: () => _onSubmitted(_controller.text),
+                      onPressed: () {
+                        setState(() {
+                          _controller.clear();
+                          _suggestions = [];
+                        });
+                        _hideOverlay();
+                      },
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: IconButton(
+                        tooltip: 'Search',
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF6F00),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                        onPressed: () => _onSubmitted(_controller.text),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
             ),
           );
         },

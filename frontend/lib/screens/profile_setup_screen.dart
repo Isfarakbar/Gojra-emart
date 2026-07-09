@@ -80,7 +80,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight - 56),
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight - 56,
+                ),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -111,11 +113,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                                       child: Image.asset(
                                         'assets/logo.png',
                                         fit: BoxFit.contain,
-                                        errorBuilder: (context, error, stackTrace) => Icon(
-                                          Icons.person_rounded,
-                                          size: 44,
-                                          color: theme.colorScheme.primary,
-                                        ),
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                Icon(
+                                                  Icons.person_rounded,
+                                                  size: 44,
+                                                  color:
+                                                      theme.colorScheme.primary,
+                                                ),
                                       ),
                                     ),
                             ),

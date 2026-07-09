@@ -21,9 +21,20 @@ class EmptyState extends StatelessWidget {
         children: [
           Icon(icon, size: 80, color: Colors.grey[300]),
           const SizedBox(height: 16),
-          Text(title, style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey[700])),
+          Text(
+            title,
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
+            ),
+          ),
           const SizedBox(height: 8),
-          Text(message, style: GoogleFonts.inter(color: Colors.grey[600]), textAlign: TextAlign.center),
+          Text(
+            message,
+            style: GoogleFonts.inter(color: Colors.grey[600]),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );
@@ -50,18 +61,30 @@ class ErrorStateWidget extends StatelessWidget {
           children: [
             Icon(Icons.error_outline, size: 60, color: Colors.red[300]),
             const SizedBox(height: 16),
-            Text("Oops!", style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(
+              "Oops!",
+              style: GoogleFonts.poppins(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 8),
-            Text(message, textAlign: TextAlign.center, style: GoogleFonts.inter(color: Colors.grey[600])),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(color: Colors.grey[600]),
+            ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
               label: const Text("Try Again"),
               style: ElevatedButton.styleFrom(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
               ),
-            )
+            ),
           ],
         ),
       ),

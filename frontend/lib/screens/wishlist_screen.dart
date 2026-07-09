@@ -16,7 +16,13 @@ class WishlistScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text("My Wishlist", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.black)),
+        title: Text(
+          "My Wishlist",
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
@@ -26,7 +32,8 @@ class WishlistScreen extends StatelessWidget {
           ? EmptyState(
               icon: Icons.favorite_border,
               title: "Wishlist Empty",
-              subtitle: "Save your favorite products to quickly find them later.",
+              subtitle:
+                  "Save your favorite products to quickly find them later.",
               buttonText: "Discover Products",
               onButtonPressed: () {
                 Navigator.of(context).popUntil((route) => route.isFirst);
@@ -35,7 +42,11 @@ class WishlistScreen extends StatelessWidget {
           : GridView.builder(
               padding: const EdgeInsets.all(16),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2, childAspectRatio: 0.7, crossAxisSpacing: 12, mainAxisSpacing: 12),
+                crossAxisCount: 2,
+                childAspectRatio: 0.67,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
               itemCount: wishlistProvider.wishlist.length,
               itemBuilder: (context, index) {
                 final product = wishlistProvider.wishlist[index];

@@ -25,8 +25,11 @@ class HomeSettings {
     final data = json ?? {};
     return HomeSettings(
       headerTitle: data['headerTitle'] ?? 'Fresh groceries delivered fast',
-      headerSubtitle: data['headerSubtitle'] ?? 'Shop daily essentials, produce, dairy, snacks, and household items.',
-      searchPlaceholder: data['searchPlaceholder'] ?? 'Search rice, milk, vegetables...',
+      headerSubtitle:
+          data['headerSubtitle'] ??
+          'Shop daily essentials, produce, dairy, snacks, and household items.',
+      searchPlaceholder:
+          data['searchPlaceholder'] ?? 'Search rice, milk, vegetables...',
       categoryTitle: data['categoryTitle'] ?? 'Shop by Category',
       exploreTitle: data['exploreTitle'] ?? 'Explore Products',
       showBanners: data['showBanners'] ?? true,
@@ -38,7 +41,8 @@ class HomeSettings {
 
   static const defaults = HomeSettings(
     headerTitle: 'Fresh groceries delivered fast',
-    headerSubtitle: 'Shop daily essentials, produce, dairy, snacks, and household items.',
+    headerSubtitle:
+        'Shop daily essentials, produce, dairy, snacks, and household items.',
     searchPlaceholder: 'Search rice, milk, vegetables...',
     categoryTitle: 'Shop by Category',
     exploreTitle: 'Explore Products',

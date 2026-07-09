@@ -18,14 +18,26 @@ class ProductProvider with ChangeNotifier {
     _errorMessage = null; // Reset error
     notifyListeners();
     try {
-      final response = await _apiService.dio.get('/products', queryParameters: {'page': 1});
-      final firstPageProducts = response.data is Map ? response.data['products'] ?? [] : response.data;
+      final response = await _apiService.dio.get(
+        '/products',
+        queryParameters: {'page': 1},
+      );
+      final firstPageProducts = response.data is Map
+          ? response.data['products'] ?? []
+          : response.data;
       final totalPages = response.data is Map ? response.data['pages'] ?? 1 : 1;
       final allProducts = List<dynamic>.from(firstPageProducts);
 
       for (var page = 2; page <= totalPages; page++) {
-        final pageResponse = await _apiService.dio.get('/products', queryParameters: {'page': page});
-        allProducts.addAll(pageResponse.data is Map ? pageResponse.data['products'] ?? [] : pageResponse.data);
+        final pageResponse = await _apiService.dio.get(
+          '/products',
+          queryParameters: {'page': page},
+        );
+        allProducts.addAll(
+          pageResponse.data is Map
+              ? pageResponse.data['products'] ?? []
+              : pageResponse.data,
+        );
       }
 
       _products = allProducts;
@@ -60,9 +72,10 @@ class ProductProvider with ChangeNotifier {
 
   List<dynamic> _filteredProducts = [];
   bool _hasActiveFilter = false;
-  List<dynamic> get filteredProducts => _hasActiveFilter ? _filteredProducts : _products;
+  List<dynamic> get filteredProducts =>
+      _hasActiveFilter ? _filteredProducts : _products;
   bool get hasActiveFilter => _hasActiveFilter;
-  
+
   String _searchQuery = "";
 
   List<dynamic> _searchResults = [];
@@ -93,36 +106,41 @@ class ProductProvider with ChangeNotifier {
     } else {
       _hasActiveFilter = true;
       _filteredProducts = _products.where((product) {
-         final productCategory = product['category'];
-         final target = category.toLowerCase().trim();
-         final categoryName = productCategory is Map
-             ? (productCategory['name'] ?? '').toString().toLowerCase()
-             : productCategory.toString().toLowerCase();
-         final categoryId = productCategory is Map
-             ? (productCategory['_id'] ?? '').toString().toLowerCase()
-             : productCategory.toString().toLowerCase();
-         return categoryName == target || categoryId == target;
+        final productCategory = product['category'];
+        final target = category.toLowerCase().trim();
+        final categoryName = productCategory is Map
+            ? (productCategory['name'] ?? '').toString().toLowerCase()
+            : productCategory.toString().toLowerCase();
+        final categoryId = productCategory is Map
+            ? (productCategory['_id'] ?? '').toString().toLowerCase()
+            : productCategory.toString().toLowerCase();
+        return categoryName == target || categoryId == target;
       }).toList();
     }
     notifyListeners();
   }
 
   Future<void> searchProductsApi(String query) async {
-      if (query.isEmpty) {
-          _searchResults = [];
-          notifyListeners();
-          return;
-      }
-      _isSearching = true;
+    if (query.isEmpty) {
+      _searchResults = [];
       notifyListeners();
-      try {
-          final response = await _apiService.dio.get('/products', queryParameters: {'keyword': query});
-          _searchResults = response.data is Map ? response.data['products'] ?? [] : response.data;
-      } catch (e) {
-          debugPrint("Error searching products: $e");
-      }
-      _isSearching = false;
-      notifyListeners();
+      return;
+    }
+    _isSearching = true;
+    notifyListeners();
+    try {
+      final response = await _apiService.dio.get(
+        '/products',
+        queryParameters: {'keyword': query},
+      );
+      _searchResults = response.data is Map
+          ? response.data['products'] ?? []
+          : response.data;
+    } catch (e) {
+      debugPrint("Error searching products: $e");
+    }
+    _isSearching = false;
+    notifyListeners();
   }
 
   Future<List<Map<String, dynamic>>> getSearchSuggestions(String query) async {
@@ -130,7 +148,10 @@ class ProductProvider with ChangeNotifier {
       return [];
     }
     try {
-      final response = await _apiService.dio.get('/products/search', queryParameters: {'q': query});
+      final response = await _apiService.dio.get(
+        '/products/search',
+        queryParameters: {'q': query},
+      );
       if (response.data is List) {
         return List<Map<String, dynamic>>.from(response.data);
       }

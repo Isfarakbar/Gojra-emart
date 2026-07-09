@@ -48,7 +48,12 @@ class ProductGridSkeleton extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Expanded(child: SkeletonLoader(height: double.infinity, width: double.infinity)),
+            const Expanded(
+              child: SkeletonLoader(
+                height: double.infinity,
+                width: double.infinity,
+              ),
+            ),
             const SizedBox(height: 8),
             const SkeletonLoader(height: 16, width: 120),
             const SizedBox(height: 4),
@@ -72,7 +77,8 @@ class CategoryListSkeleton extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         itemCount: 5,
         separatorBuilder: (context, index) => const SizedBox(width: 12),
-        itemBuilder: (context, index) => const SkeletonLoader(height: 40, width: 100, borderRadius: 20),
+        itemBuilder: (context, index) =>
+            const SkeletonLoader(height: 40, width: 100, borderRadius: 20),
       ),
     );
   }

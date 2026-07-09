@@ -26,8 +26,10 @@ class _SearchScreenState extends State<SearchScreen> {
     if (widget.initialQuery != null) {
       _searchController.text = widget.initialQuery!;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Provider.of<ProductProvider>(context, listen: false)
-            .searchProductsApi(widget.initialQuery!);
+        Provider.of<ProductProvider>(
+          context,
+          listen: false,
+        ).searchProductsApi(widget.initialQuery!);
       });
     }
   }
@@ -43,13 +45,18 @@ class _SearchScreenState extends State<SearchScreen> {
   void _onSearchChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () {
-      Provider.of<ProductProvider>(context, listen: false).searchProductsApi(query);
+      Provider.of<ProductProvider>(
+        context,
+        listen: false,
+      ).searchProductsApi(query);
     });
   }
 
   Future<void> _handleRefresh() async {
-    await Provider.of<ProductProvider>(context, listen: false)
-        .searchProductsApi(_searchController.text);
+    await Provider.of<ProductProvider>(
+      context,
+      listen: false,
+    ).searchProductsApi(_searchController.text);
   }
 
   @override
@@ -72,7 +79,9 @@ class _SearchScreenState extends State<SearchScreen> {
             color: Colors.grey[100],
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: _searchFocusNode.hasFocus ? const Color(0xFF2E7D32) : Colors.transparent,
+              color: _searchFocusNode.hasFocus
+                  ? const Color(0xFF2E7D32)
+                  : Colors.transparent,
               width: 1.5,
             ),
           ),
@@ -93,7 +102,10 @@ class _SearchScreenState extends State<SearchScreen> {
                     isDense: true,
                     contentPadding: EdgeInsets.symmetric(vertical: 10),
                   ),
-                  style: GoogleFonts.poppins(color: Colors.black87, fontSize: 14),
+                  style: GoogleFonts.poppins(
+                    color: Colors.black87,
+                    fontSize: 14,
+                  ),
                 ),
               ),
               if (_searchController.text.isNotEmpty)
@@ -105,7 +117,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     });
                     productProvider.searchProductsApi('');
                   },
-                )
+                ),
             ],
           ),
         ),
@@ -136,34 +148,38 @@ class _SearchScreenState extends State<SearchScreen> {
                     child: ProductSkeletonGrid(),
                   )
                 : _searchController.text.isEmpty
-                    ? EmptyState(
-                        icon: Icons.search,
-                        title: "Search Products",
-                        subtitle: "Search across all our premium grocery categories.",
-                      )
-                    : productProvider.searchResults.isEmpty
-                        ? EmptyState(
-                            icon: Icons.search_off,
-                            title: "No Results",
-                            subtitle: "Try a different keyword",
-                          )
-                        : RefreshIndicator(
-                            onRefresh: _handleRefresh,
-                            color: const Color(0xFF2E7D32),
-                            child: GridView.builder(
-                              padding: const EdgeInsets.all(16),
-                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                childAspectRatio: 0.72,
-                                crossAxisSpacing: 12,
-                                mainAxisSpacing: 12,
-                              ),
-                              itemCount: productProvider.searchResults.length,
-                              itemBuilder: (context, index) {
-                                return ProductCard(product: productProvider.searchResults[index]);
-                              },
-                            ),
+                ? EmptyState(
+                    icon: Icons.search,
+                    title: "Search Products",
+                    subtitle:
+                        "Search across all our premium grocery categories.",
+                  )
+                : productProvider.searchResults.isEmpty
+                ? EmptyState(
+                    icon: Icons.search_off,
+                    title: "No Results",
+                    subtitle: "Try a different keyword",
+                  )
+                : RefreshIndicator(
+                    onRefresh: _handleRefresh,
+                    color: const Color(0xFF2E7D32),
+                    child: GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            childAspectRatio: 0.68,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
                           ),
+                      itemCount: productProvider.searchResults.length,
+                      itemBuilder: (context, index) {
+                        return ProductCard(
+                          product: productProvider.searchResults[index],
+                        );
+                      },
+                    ),
+                  ),
           ),
         ],
       ),

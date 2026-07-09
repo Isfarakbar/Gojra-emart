@@ -7,5 +7,7 @@ node_modules/
 backend/.env
 admin/.env.local
 frontend/.dart_appdata/
+admin/playwright-report/
+admin/test-results/
 
 *.apk

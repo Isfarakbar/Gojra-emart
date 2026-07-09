@@ -15,7 +15,8 @@ class ProductCard extends StatefulWidget {
   State<ProductCard> createState() => _ProductCardState();
 }
 
-class _ProductCardState extends State<ProductCard> with SingleTickerProviderStateMixin {
+class _ProductCardState extends State<ProductCard>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
 
@@ -26,9 +27,10 @@ class _ProductCardState extends State<ProductCard> with SingleTickerProviderStat
       vsync: this,
       duration: const Duration(milliseconds: 150),
     );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.95,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -63,19 +65,27 @@ class _ProductCardState extends State<ProductCard> with SingleTickerProviderStat
 
     return GestureDetector(
       onTap: () {
-         Navigator.of(context).push(MaterialPageRoute(builder: (_) => ProductDetailScreen(product: widget.product)));
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ProductDetailScreen(product: widget.product),
+          ),
+        );
       },
       child: AnimatedBuilder(
         animation: _scaleAnimation,
-        builder: (context, child) => Transform.scale(
-          scale: _scaleAnimation.value,
-          child: child,
-        ),
+        builder: (context, child) =>
+            Transform.scale(scale: _scaleAnimation.value, child: child),
         child: Container(
           decoration: BoxDecoration(
             color: theme.colorScheme.surface,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
@@ -97,49 +107,67 @@ class _ProductCardState extends State<ProductCard> with SingleTickerProviderStat
                     ),
                     // Discount Badge
                     if (oldPrice != null && oldPrice > price)
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          "${(((oldPrice - price) / oldPrice) * 100).round()}% OFF", 
-                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            "${(((oldPrice - price) / oldPrice) * 100).round()}% OFF",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
                     // Featured Badge
                     if (isFeatured)
-                    Positioned(
-                      top: (oldPrice != null && oldPrice > price) ? 30 : 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.secondary,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          "Featured", 
-                          style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      Positioned(
+                        top: (oldPrice != null && oldPrice > price) ? 30 : 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.secondary,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            "Featured",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
                     // Wishlist Icon
                     Positioned(
                       top: 8,
                       right: 8,
                       child: GestureDetector(
                         onTap: () {
-                           wishlistProvider.toggleWishlist(widget.product['_id']);
-                           Helpers.showSnackBar(
-                             context, 
-                             isWishlisted ? 'Removed from wishlist' : 'Added to wishlist'
-                           );
+                          wishlistProvider.toggleWishlist(
+                            widget.product['_id'],
+                          );
+                          Helpers.showSnackBar(
+                            context,
+                            isWishlisted
+                                ? 'Removed from wishlist'
+                                : 'Added to wishlist',
+                          );
                         },
                         child: Container(
                           padding: const EdgeInsets.all(4),
@@ -148,7 +176,9 @@ class _ProductCardState extends State<ProductCard> with SingleTickerProviderStat
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
-                            isWishlisted ? Icons.favorite : Icons.favorite_border,
+                            isWishlisted
+                                ? Icons.favorite
+                                : Icons.favorite_border,
                             color: isWishlisted ? Colors.red : Colors.grey,
                             size: 18,
                           ),
@@ -158,7 +188,7 @@ class _ProductCardState extends State<ProductCard> with SingleTickerProviderStat
                   ],
                 ),
               ),
-              
+
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(8.0),
@@ -170,9 +200,11 @@ class _ProductCardState extends State<ProductCard> with SingleTickerProviderStat
                         widget.product['name'] ?? '',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                      
+
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         crossAxisAlignment: CrossAxisAlignment.end,
@@ -182,14 +214,14 @@ class _ProductCardState extends State<ProductCard> with SingleTickerProviderStat
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 if (oldPrice != null && oldPrice > price)
-                                Text(
-                                  Helpers.formatCurrency(oldPrice),
-                                  style: TextStyle(
-                                    decoration: TextDecoration.lineThrough,
-                                    color: Colors.grey[500],
-                                    fontSize: 12,
+                                  Text(
+                                    Helpers.formatCurrency(oldPrice),
+                                    style: TextStyle(
+                                      decoration: TextDecoration.lineThrough,
+                                      color: Colors.grey[500],
+                                      fontSize: 12,
+                                    ),
                                   ),
-                                ),
                                 Text(
                                   Helpers.formatCurrency(price),
                                   style: theme.textTheme.bodyLarge?.copyWith(
@@ -205,12 +237,16 @@ class _ProductCardState extends State<ProductCard> with SingleTickerProviderStat
                             child: Container(
                               padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
-                                color: inStock ? theme.colorScheme.primary : Colors.grey[300],
+                                color: inStock
+                                    ? theme.colorScheme.primary
+                                    : Colors.grey[300],
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Icon(
                                 Icons.add_shopping_cart,
-                                color: inStock ? Colors.white : Colors.grey[500],
+                                color: inStock
+                                    ? Colors.white
+                                    : Colors.grey[500],
                                 size: 20,
                               ),
                             ),

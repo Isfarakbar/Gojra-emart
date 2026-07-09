@@ -128,7 +128,7 @@ const adjustStock = async (req, res) => {
                     $inc: { 'variants.$.stock': amount },
                     ...(Object.keys(thresholdUpdate).length ? { $set: thresholdUpdate } : {}),
                 },
-                { new: false, runValidators: true }
+                { returnDocument: 'before', runValidators: true }
             );
             const previousVariant = previousDocument?.variants.find(item => item.unit === variantName);
             previousStock = previousVariant?.stock;
@@ -139,7 +139,7 @@ const adjustStock = async (req, res) => {
                     $inc: { stock: amount },
                     ...(Object.keys(thresholdUpdate).length ? { $set: thresholdUpdate } : {}),
                 },
-                { new: false, runValidators: true }
+                { returnDocument: 'before', runValidators: true }
             );
             previousStock = previousDocument?.stock;
         }

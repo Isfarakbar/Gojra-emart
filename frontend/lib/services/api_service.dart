@@ -10,18 +10,25 @@ class ApiService {
     defaultValue: 'https://gojra-emart-backend.onrender.com/api',
   );
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 15),
-      headers: {'Content-Type': 'application/json'},
-    ),
-  );
+  final Dio _dio;
+  final FlutterSecureStorage _storage;
 
-  final _storage = const FlutterSecureStorage();
-
-  ApiService() {
+  ApiService({
+    Dio? dio,
+    FlutterSecureStorage? storage,
+    bool attachInterceptors = true,
+  }) : _dio =
+           dio ??
+           Dio(
+             BaseOptions(
+               baseUrl: baseUrl,
+               connectTimeout: const Duration(seconds: 15),
+               receiveTimeout: const Duration(seconds: 15),
+               headers: {'Content-Type': 'application/json'},
+             ),
+           ),
+       _storage = storage ?? const FlutterSecureStorage() {
+    if (!attachInterceptors) return;
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {

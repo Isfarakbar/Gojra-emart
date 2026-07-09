@@ -88,7 +88,7 @@ const submitReview = async (req, res) => {
             comment: cleanComment,
             status: 'Pending',
         },
-        { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+        { returnDocument: 'after', upsert: true, runValidators: true, setDefaultsOnInsert: true }
     );
 
     await updateProductRating(productId);
@@ -129,7 +129,7 @@ const moderateReview = async (req, res) => {
     const review = await Review.findByIdAndUpdate(
         req.params.id,
         { status },
-        { new: true, runValidators: true }
+        { returnDocument: 'after', runValidators: true }
     );
     if (!review) return res.status(404).json({ message: 'Review not found.' });
 

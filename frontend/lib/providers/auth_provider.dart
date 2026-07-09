@@ -91,6 +91,9 @@ class AuthProvider with ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
+        if (response.data['role'] == 'admin') {
+          return 'Admin accounts must use the web admin panel.';
+        }
         _token = response.data['token'];
         _user = {
           ...Map<String, dynamic>.from(response.data),
@@ -122,6 +125,9 @@ class AuthProvider with ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
+        if (response.data['role'] == 'admin') {
+          return 'Admin accounts must use the web admin panel.';
+        }
         _token = response.data['token'];
         _user = response.data;
         await _saveSession();
@@ -286,6 +292,9 @@ class AuthProvider with ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
+        if (response.data['role'] == 'admin') {
+          return 'Admin accounts must use the web admin panel.';
+        }
         _user = response.data;
         _token = _user!['token'];
 
@@ -323,9 +332,17 @@ class AuthProvider with ChangeNotifier {
       await _registerNotifications();
       notifyListeners();
       return true;
+    } on DioException catch (error) {
+      final statusCode = error.response?.statusCode;
+      if (statusCode == 401 || statusCode == 403) {
+        await logout();
+        return false;
+      }
+      notifyListeners();
+      return _user != null;
     } catch (_) {
-      await logout();
-      return false;
+      notifyListeners();
+      return _user != null;
     }
   }
 

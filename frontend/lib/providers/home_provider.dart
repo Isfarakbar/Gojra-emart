@@ -6,7 +6,7 @@ import '../models/home_settings_model.dart';
 
 class HomeProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
-  
+
   List<AppBanner> _banners = [];
   List<HomeSection> _sections = [];
   HomeSettings _settings = HomeSettings.defaults;
@@ -22,7 +22,7 @@ class HomeProvider with ChangeNotifier {
     notifyListeners();
     try {
       final response = await _apiService.dio.get('/layout/home');
-      
+
       _settings = HomeSettings.fromJson(response.data['settings']);
 
       final bannersData = response.data['banners'] as List? ?? [];
@@ -30,7 +30,6 @@ class HomeProvider with ChangeNotifier {
 
       final sectionsData = response.data['sections'] as List? ?? [];
       _sections = sectionsData.map((e) => HomeSection.fromJson(e)).toList();
-      
     } catch (e) {
       debugPrint("Error fetching home layout: $e");
     } finally {

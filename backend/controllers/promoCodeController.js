@@ -78,7 +78,7 @@ const updatePromoCode = async (req, res) => {
         if (payload.code) payload.code = normalizeCode(payload.code);
 
         const promoCode = await PromoCode.findByIdAndUpdate(req.params.id, payload, {
-            new: true,
+            returnDocument: 'after',
             runValidators: true,
         });
 

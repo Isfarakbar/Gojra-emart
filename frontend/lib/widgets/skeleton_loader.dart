@@ -55,7 +55,11 @@ class ProductSkeletonGrid extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Expanded(
-                child: SkeletonLoader(width: double.infinity, height: double.infinity, borderRadius: 12),
+                child: SkeletonLoader(
+                  width: double.infinity,
+                  height: double.infinity,
+                  borderRadius: 12,
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.all(8.0),
@@ -66,7 +70,10 @@ class ProductSkeletonGrid extends StatelessWidget {
                     SizedBox(height: 8),
                     SkeletonLoader(width: 60, height: 16),
                     SizedBox(height: 8),
-                    SkeletonLoader(width: double.infinity, height: 36), // Button
+                    SkeletonLoader(
+                      width: double.infinity,
+                      height: 36,
+                    ), // Button
                   ],
                 ),
               ),

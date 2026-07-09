@@ -6,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart' as app_auth;
-import 'admin/admin_dashboard.dart';
 import 'main_screen.dart';
 import 'profile_setup_screen.dart';
 
@@ -41,8 +40,10 @@ class _LoginScreenState extends State<LoginScreen>
   final _forgotEmailController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmNewPasswordController = TextEditingController();
-  final List<TextEditingController> _otpControllers =
-      List.generate(6, (_) => TextEditingController());
+  final List<TextEditingController> _otpControllers = List.generate(
+    6,
+    (_) => TextEditingController(),
+  );
   final List<FocusNode> _otpFocusNodes = List.generate(6, (_) => FocusNode());
 
   late final AnimationController _entranceController;
@@ -74,13 +75,13 @@ class _LoginScreenState extends State<LoginScreen>
       parent: _entranceController,
       curve: Curves.easeOutCubic,
     );
-    _slide = Tween<Offset>(
-      begin: const Offset(0, 0.05),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _entranceController,
-      curve: Curves.easeOutCubic,
-    ));
+    _slide = Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _entranceController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
     _entranceController.forward();
   }
 
@@ -163,7 +164,9 @@ class _LoginScreenState extends State<LoginScreen>
 
   Future<void> _sendPhoneOtp({bool resend = false}) async {
     if (_phoneDigits.length != 10) {
-      setState(() => _inlineError = 'Enter a valid 10 digit Pakistani mobile number.');
+      setState(
+        () => _inlineError = 'Enter a valid 10 digit Pakistani mobile number.',
+      );
       return;
     }
 
@@ -179,15 +182,19 @@ class _LoginScreenState extends State<LoginScreen>
         forceResendingToken: resend ? _resendToken : null,
         verificationCompleted: (credential) async {
           try {
-            final result =
-                await FirebaseAuth.instance.signInWithCredential(credential);
+            final result = await FirebaseAuth.instance.signInWithCredential(
+              credential,
+            );
             final idToken = await result.user?.getIdToken();
             if (idToken != null) {
               await _completePhoneLogin(idToken);
             }
           } catch (_) {
             if (mounted) {
-              setState(() => _inlineError = 'Auto verification failed. Enter the OTP manually.');
+              setState(
+                () => _inlineError =
+                    'Auto verification failed. Enter the OTP manually.',
+              );
             }
           }
         },
@@ -236,7 +243,9 @@ class _LoginScreenState extends State<LoginScreen>
         verificationId: _verificationId!,
         smsCode: _otp,
       );
-      final result = await FirebaseAuth.instance.signInWithCredential(credential);
+      final result = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
       final idToken = await result.user?.getIdToken();
 
       if (idToken == null) {
@@ -260,8 +269,9 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _completePhoneLogin(String idToken) async {
-    final error =
-        await context.read<app_auth.AuthProvider>().firebasePhoneLogin(idToken);
+    final error = await context
+        .read<app_auth.AuthProvider>()
+        .firebasePhoneLogin(idToken);
     if (!mounted) return;
     setState(() => _isLoading = false);
     if (error == null) {
@@ -302,12 +312,7 @@ class _LoginScreenState extends State<LoginScreen>
     final auth = context.read<app_auth.AuthProvider>();
     final error = _isLoginMode
         ? await auth.login(email, password)
-        : await auth.register(
-            _nameController.text.trim(),
-            email,
-            password,
-            '',
-          );
+        : await auth.register(_nameController.text.trim(), email, password, '');
 
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -338,15 +343,6 @@ class _LoginScreenState extends State<LoginScreen>
 
   void _routeAfterAuth() {
     final auth = context.read<app_auth.AuthProvider>();
-    final user = auth.user;
-
-    if (user?['role'] == 'admin') {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const AdminDashboard()),
-        (route) => false,
-      );
-      return;
-    }
 
     if (auth.needsProfileSetup) {
       Navigator.of(context).pushAndRemoveUntil(
@@ -374,8 +370,9 @@ class _LoginScreenState extends State<LoginScreen>
       _inlineError = null;
     });
 
-    final error =
-        await context.read<app_auth.AuthProvider>().forgotPassword(email);
+    final error = await context.read<app_auth.AuthProvider>().forgotPassword(
+      email,
+    );
     if (!mounted) return;
     setState(() => _isLoading = false);
 
@@ -395,9 +392,10 @@ class _LoginScreenState extends State<LoginScreen>
       _inlineError = null;
     });
 
-    final error = await context
-        .read<app_auth.AuthProvider>()
-        .verifyOTP(_forgotEmailController.text.trim(), _otp);
+    final error = await context.read<app_auth.AuthProvider>().verifyOTP(
+      _forgotEmailController.text.trim(),
+      _otp,
+    );
 
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -427,10 +425,10 @@ class _LoginScreenState extends State<LoginScreen>
     });
 
     final error = await context.read<app_auth.AuthProvider>().resetPassword(
-          _forgotEmailController.text.trim(),
-          _verifiedResetOtp ?? '',
-          password,
-        );
+      _forgotEmailController.text.trim(),
+      _verifiedResetOtp ?? '',
+      password,
+    );
 
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -477,10 +475,7 @@ class _LoginScreenState extends State<LoginScreen>
           child: SlideTransition(
             key: ValueKey(_step),
             position: _slide,
-            child: FadeTransition(
-              opacity: _fade,
-              child: _buildStep(),
-            ),
+            child: FadeTransition(opacity: _fade, child: _buildStep()),
           ),
         ),
       ),
@@ -518,10 +513,7 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  Widget _buildShell({
-    required List<Widget> children,
-    bool showBack = true,
-  }) {
+  Widget _buildShell({required List<Widget> children, bool showBack = true}) {
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
@@ -560,7 +552,8 @@ class _LoginScreenState extends State<LoginScreen>
             child: Lottie.network(
               'https://assets7.lottiefiles.com/packages/lf20_2m1smtya.json',
               fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => _GroceryIllustration(),
+              errorBuilder: (context, error, stackTrace) =>
+                  _GroceryIllustration(),
             ),
           ),
         ),
@@ -674,11 +667,13 @@ class _LoginScreenState extends State<LoginScreen>
                 border: Border.all(color: const Color(0xFFE4ECE5)),
               ),
               child: Center(
-                child: Text('🇵🇰  +92',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    )),
+                child: Text(
+                  '🇵🇰  +92',
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -836,9 +831,11 @@ class _LoginScreenState extends State<LoginScreen>
           obscureText: !_showPassword,
           suffix: IconButton(
             onPressed: () => setState(() => _showPassword = !_showPassword),
-            icon: Icon(_showPassword
-                ? Icons.visibility_off_outlined
-                : Icons.visibility_outlined),
+            icon: Icon(
+              _showPassword
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+            ),
           ),
         ),
         if (!_isLoginMode) ...[
@@ -849,11 +846,13 @@ class _LoginScreenState extends State<LoginScreen>
             icon: Icons.lock_reset_rounded,
             obscureText: !_showConfirmPassword,
             suffix: IconButton(
-              onPressed: () => setState(
-                  () => _showConfirmPassword = !_showConfirmPassword),
-              icon: Icon(_showConfirmPassword
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined),
+              onPressed: () =>
+                  setState(() => _showConfirmPassword = !_showConfirmPassword),
+              icon: Icon(
+                _showConfirmPassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+              ),
             ),
           ),
         ],
@@ -915,7 +914,8 @@ class _LoginScreenState extends State<LoginScreen>
         const SizedBox(height: 22),
         const _StepHeader(
           title: 'Reset your password',
-          subtitle: 'Enter your email and we will send a secure verification code.',
+          subtitle:
+              'Enter your email and we will send a secure verification code.',
         ),
         const SizedBox(height: 30),
         _PremiumTextField(
@@ -954,10 +954,13 @@ class _LoginScreenState extends State<LoginScreen>
           icon: Icons.lock_outline_rounded,
           obscureText: !_showNewPassword,
           suffix: IconButton(
-            onPressed: () => setState(() => _showNewPassword = !_showNewPassword),
-            icon: Icon(_showNewPassword
-                ? Icons.visibility_off_outlined
-                : Icons.visibility_outlined),
+            onPressed: () =>
+                setState(() => _showNewPassword = !_showNewPassword),
+            icon: Icon(
+              _showNewPassword
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+            ),
           ),
         ),
         const SizedBox(height: 14),
@@ -1001,8 +1004,11 @@ class _LoginScreenState extends State<LoginScreen>
                 color: _green.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.check_circle_rounded,
-                  color: _green, size: 82),
+              child: const Icon(
+                Icons.check_circle_rounded,
+                color: _green,
+                size: 82,
+              ),
             ),
           ),
         ),
@@ -1140,7 +1146,10 @@ class _PremiumTextField extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: _LoginScreenState._green, width: 2),
+          borderSide: const BorderSide(
+            color: _LoginScreenState._green,
+            width: 2,
+          ),
         ),
       ),
     );
@@ -1340,13 +1349,19 @@ class _GroceryIllustration extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: const [
-          Icon(Icons.shopping_basket_rounded,
-              color: _LoginScreenState._green, size: 112),
+          Icon(
+            Icons.shopping_basket_rounded,
+            color: _LoginScreenState._green,
+            size: 112,
+          ),
           Positioned(
             right: 48,
             top: 52,
-            child: Icon(Icons.eco_rounded,
-                color: _LoginScreenState._orange, size: 34),
+            child: Icon(
+              Icons.eco_rounded,
+              color: _LoginScreenState._orange,
+              size: 34,
+            ),
           ),
         ],
       ),

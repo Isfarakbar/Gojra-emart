@@ -1,8 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/cart_storage.dart';
+import '../services/location_service.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:geolocator/geolocator.dart';
 
 class CartItem {
   final String id;
@@ -12,6 +14,7 @@ class CartItem {
   final String image;
   final String productId;
   final String? variantUnit;
+  final int maxStock;
 
   CartItem({
     required this.id,
@@ -21,7 +24,30 @@ class CartItem {
     required this.image,
     required this.productId,
     this.variantUnit,
+    required this.maxStock,
   });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'quantity': quantity,
+    'price': price,
+    'image': image,
+    'productId': productId,
+    'variantUnit': variantUnit,
+    'maxStock': maxStock,
+  };
+
+  factory CartItem.fromJson(Map<String, dynamic> json) => CartItem(
+    id: json['id']?.toString() ?? DateTime.now().toIso8601String(),
+    title: json['title']?.toString() ?? '',
+    quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+    price: (json['price'] as num?)?.toDouble() ?? 0,
+    image: json['image']?.toString() ?? '',
+    productId: json['productId']?.toString() ?? '',
+    variantUnit: json['variantUnit']?.toString(),
+    maxStock: (json['maxStock'] as num?)?.toInt() ?? 0,
+  );
 }
 
 class PlaceOrderResult {
@@ -35,11 +61,25 @@ class PlaceOrderResult {
 
 class CartProvider with ChangeNotifier {
   final Map<String, CartItem> _items = {};
-  final ApiService _apiService = ApiService();
+  final ApiService _apiService;
+  final CartStorage _storage;
+  final LocationService _locationService;
+  bool _isRestored = false;
+
+  CartProvider({
+    ApiService? apiService,
+    CartStorage? storage,
+    LocationService? locationService,
+  }) : _apiService = apiService ?? ApiService(),
+       _storage = storage ?? SharedPreferencesCartStorage(),
+       _locationService = locationService ?? GeolocatorLocationService() {
+    unawaited(_restore());
+  }
 
   Map<String, CartItem> get items => _items;
 
   int get itemCount => _items.length;
+  bool get isRestored => _isRestored;
 
   double get totalAmount {
     var total = 0.0;
@@ -59,9 +99,12 @@ class CartProvider with ChangeNotifier {
         ? (selectedVariant['price'] as num).toDouble()
         : (product['price'] as num).toDouble();
 
-    final title = product['name'];
-    final image = product['imageUrl'];
+    final title = product['name']?.toString() ?? 'Product';
+    final image = product['imageUrl']?.toString() ?? '';
     final variantUnit = selectedVariant?['unit'];
+    final availableStock =
+        ((selectedVariant?['stock'] ?? product['stock'] ?? 0) as num).toInt();
+    if (availableStock <= 0 || quantity <= 0) return;
 
     final cartKey = variantUnit != null
         ? '${productId}_$variantUnit'
@@ -73,11 +116,15 @@ class CartProvider with ChangeNotifier {
         (existingCartItem) => CartItem(
           id: existingCartItem.id,
           title: existingCartItem.title,
-          quantity: existingCartItem.quantity + quantity,
+          quantity: (existingCartItem.quantity + quantity).clamp(
+            1,
+            existingCartItem.maxStock,
+          ),
           price: existingCartItem.price,
           image: existingCartItem.image,
           productId: existingCartItem.productId,
           variantUnit: existingCartItem.variantUnit,
+          maxStock: existingCartItem.maxStock,
         ),
       );
     } else {
@@ -87,14 +134,16 @@ class CartProvider with ChangeNotifier {
           id: DateTime.now().toString(),
           title: variantUnit != null ? "$title ($variantUnit)" : title,
           price: price,
-          quantity: quantity,
+          quantity: quantity.clamp(1, availableStock),
           image: image,
           productId: productId,
           variantUnit: variantUnit,
+          maxStock: availableStock,
         ),
       );
     }
     notifyListeners();
+    _persist();
   }
 
   void addItem(String productId, double price, String title, String image) {
@@ -103,12 +152,14 @@ class CartProvider with ChangeNotifier {
       'price': price,
       'name': title,
       'imageUrl': image,
+      'stock': _items[productId]?.maxStock ?? 0,
     }, 1);
   }
 
   void removeItem(String productId) {
     _items.remove(productId);
     notifyListeners();
+    _persist();
   }
 
   void removeSingleItem(String productId) {
@@ -126,17 +177,20 @@ class CartProvider with ChangeNotifier {
           image: existingCartItem.image,
           productId: existingCartItem.productId,
           variantUnit: existingCartItem.variantUnit,
+          maxStock: existingCartItem.maxStock,
         ),
       );
     } else {
       _items.remove(productId);
     }
     notifyListeners();
+    _persist();
   }
 
   void clear() {
     _items.clear();
     notifyListeners();
+    unawaited(_storage.clear());
   }
 
   int replaceWithReorderItems(List<dynamic> reorderItems) {
@@ -173,38 +227,57 @@ class CartProvider with ChangeNotifier {
         image: (product['imageUrl'] ?? '').toString(),
         productId: productId,
         variantUnit: variantUnit,
+        maxStock: stock,
       );
       imported++;
     }
 
     notifyListeners();
+    _persist();
     return imported;
   }
 
-  Future<Map<String, dynamic>?> _captureCurrentLocation() async {
-    if (kIsWeb) return null;
-
+  Future<void> _restore() async {
     try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return null;
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+      final raw = await _storage.read();
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          for (final entry in decoded) {
+            if (entry is! Map) continue;
+            final key = entry['key']?.toString();
+            final data = entry['item'];
+            if (key == null || data is! Map) continue;
+            final item = CartItem.fromJson(Map<String, dynamic>.from(data));
+            if (item.productId.isNotEmpty &&
+                item.quantity > 0 &&
+                item.maxStock > 0) {
+              _items[key] = item;
+            }
+          }
+        }
       }
+    } catch (error) {
+      debugPrint('Cart restore failed: $error');
+      await _storage.clear();
+    } finally {
+      _isRestored = true;
+      notifyListeners();
+    }
+  }
 
-      if (permission != LocationPermission.whileInUse &&
-          permission != LocationPermission.always) {
-        return null;
-      }
+  void _persist() {
+    final encoded = jsonEncode(
+      _items.entries
+          .map((entry) => {'key': entry.key, 'item': entry.value.toJson()})
+          .toList(),
+    );
+    unawaited(_storage.write(encoded));
+  }
 
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
-      );
-
-      return {'latitude': position.latitude, 'longitude': position.longitude};
+  Future<Map<String, dynamic>?> _captureCurrentLocation() async {
+    try {
+      return await _locationService.getCurrentCoordinates();
     } catch (error) {
       debugPrint('Location capture failed: $error');
       return null;

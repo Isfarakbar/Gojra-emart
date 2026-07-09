@@ -16,7 +16,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _phoneController;
   late TextEditingController _addressController;
   final TextEditingController _passwordController = TextEditingController();
-  
+
   bool _isLoading = false;
 
   @override
@@ -40,24 +40,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    
-    final error = await Provider.of<AuthProvider>(context, listen: false).updateProfile(
-      _nameController.text,
-      _phoneController.text,
-      _addressController.text,
-      password: _passwordController.text.isNotEmpty ? _passwordController.text : null,
-    );
+
+    final error = await Provider.of<AuthProvider>(context, listen: false)
+        .updateProfile(
+          _nameController.text,
+          _phoneController.text,
+          _addressController.text,
+          password: _passwordController.text.isNotEmpty
+              ? _passwordController.text
+              : null,
+        );
 
     setState(() => _isLoading = false);
 
     if (error == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Profile updated successfully!"), backgroundColor: Colors.green),
+        const SnackBar(
+          content: Text("Profile updated successfully!"),
+          backgroundColor: Colors.green,
+        ),
       );
       Navigator.of(context).pop();
     } else {
-       if (!mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error), backgroundColor: Colors.red),
       );
@@ -69,7 +75,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text("Edit Profile", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.black)),
+        title: Text(
+          "Edit Profile",
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
@@ -85,45 +97,75 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-               Text("Personal Information", style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
-               const SizedBox(height: 16),
-               
-               _buildTextField("Name", _nameController, Icons.person),
-               const SizedBox(height: 16),
-               
-               _buildTextField("Phone", _phoneController, Icons.phone, keyboardType: TextInputType.phone),
-               const SizedBox(height: 16),
-               
-               _buildTextField("Address", _addressController, Icons.location_on, maxLines: 3),
-               const SizedBox(height: 24),
-               
-               Text("Security", style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
-               const SizedBox(height: 16),
-               
-               _buildTextField(
-                 "New Password (Optional)", 
-                 _passwordController, 
-                 Icons.lock, 
-                 isObscure: true,
-                 helperText: "Leave blank to keep current password",
-               ),
-               
-               const SizedBox(height: 40),
-               
-               SizedBox(
-                 width: double.infinity,
-                 height: 50,
-                 child: ElevatedButton(
-                   onPressed: _isLoading ? null : _saveProfile,
-                   style: ElevatedButton.styleFrom(
-                     backgroundColor: Theme.of(context).colorScheme.primary,
-                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                   ),
-                   child: _isLoading 
-                        ? const CircularProgressIndicator(color: Colors.white) 
-                        : Text("Save Changes", style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold)),
-                 ),
-               ),
+              Text(
+                "Personal Information",
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              _buildTextField("Name", _nameController, Icons.person),
+              const SizedBox(height: 16),
+
+              _buildTextField(
+                "Phone",
+                _phoneController,
+                Icons.phone,
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 16),
+
+              _buildTextField(
+                "Address",
+                _addressController,
+                Icons.location_on,
+                maxLines: 3,
+              ),
+              const SizedBox(height: 24),
+
+              Text(
+                "Security",
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              _buildTextField(
+                "New Password (Optional)",
+                _passwordController,
+                Icons.lock,
+                isObscure: true,
+                helperText: "Leave blank to keep current password",
+              ),
+
+              const SizedBox(height: 40),
+
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _saveProfile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : Text(
+                          "Save Changes",
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+              ),
             ],
           ),
         ),
@@ -131,33 +173,42 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, IconData icon, {
-      bool isObscure = false, 
-      TextInputType keyboardType = TextInputType.text,
-      int maxLines = 1,
-      String? helperText,
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller,
+    IconData icon, {
+    bool isObscure = false,
+    TextInputType keyboardType = TextInputType.text,
+    int maxLines = 1,
+    String? helperText,
   }) {
-      return TextFormField(
-        controller: controller,
-        obscureText: isObscure,
-        keyboardType: keyboardType,
-        maxLines: maxLines,
-        decoration: InputDecoration(
-          labelText: label,
-          helperText: helperText,
-          prefixIcon: Icon(icon, color: Colors.grey),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+    return TextFormField(
+      controller: controller,
+      obscureText: isObscure,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        helperText: helperText,
+        prefixIcon: Icon(icon, color: Colors.grey),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 16,
+          horizontal: 16,
         ),
-        validator: (value) {
-           if (!isObscure && (value == null || value.isEmpty)) {
-              return "This field is required";
-           }
-           if (isObscure && value != null && value.isNotEmpty && value.length < 6) {
-             return "Password must be at least 6 characters";
-           }
-           return null;
-        },
-      );
+      ),
+      validator: (value) {
+        if (!isObscure && (value == null || value.isEmpty)) {
+          return "This field is required";
+        }
+        if (isObscure &&
+            value != null &&
+            value.isNotEmpty &&
+            value.length < 6) {
+          return "Password must be at least 6 characters";
+        }
+        return null;
+      },
+    );
   }
 }

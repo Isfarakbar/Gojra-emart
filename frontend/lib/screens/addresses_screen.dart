@@ -44,7 +44,10 @@ class AddressesScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _setDefault(BuildContext context, Map<String, dynamic> address) async {
+  Future<void> _setDefault(
+    BuildContext context,
+    Map<String, dynamic> address,
+  ) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final error = await auth.setDefaultAddress(address['_id']);
     if (!context.mounted) return;
@@ -55,15 +58,24 @@ class AddressesScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _deleteAddress(BuildContext context, Map<String, dynamic> address) async {
+  Future<void> _deleteAddress(
+    BuildContext context,
+    Map<String, dynamic> address,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete address?'),
         content: const Text('This address will be removed from your account.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
         ],
       ),
     );
@@ -80,7 +92,10 @@ class AddressesScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _openAddressSheet(BuildContext context, {Map<String, dynamic>? address}) async {
+  Future<void> _openAddressSheet(
+    BuildContext context, {
+    Map<String, dynamic>? address,
+  }) async {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -115,7 +130,9 @@ class _AddressCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDefault ? Theme.of(context).colorScheme.primary : Colors.grey.shade200,
+          color: isDefault
+              ? Theme.of(context).colorScheme.primary
+              : Colors.grey.shade200,
           width: isDefault ? 1.5 : 1,
         ),
         boxShadow: [
@@ -131,20 +148,30 @@ class _AddressCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.location_on_outlined, color: Theme.of(context).colorScheme.primary),
+              Icon(
+                Icons.location_on_outlined,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   address['label'] ?? 'Address',
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
               ),
               if (isDefault)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color:
-                        Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(99),
                   ),
                   child: Text(
@@ -172,10 +199,19 @@ class _AddressCard extends StatelessWidget {
           Row(
             children: [
               if (!isDefault)
-                TextButton(onPressed: onDefault, child: const Text('Set default')),
+                TextButton(
+                  onPressed: onDefault,
+                  child: const Text('Set default'),
+                ),
               const Spacer(),
-              IconButton(onPressed: onEdit, icon: const Icon(Icons.edit_outlined)),
-              IconButton(onPressed: onDelete, icon: const Icon(Icons.delete_outline, color: Colors.redAccent)),
+              IconButton(
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined),
+              ),
+              IconButton(
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              ),
             ],
           ),
         ],
@@ -272,19 +308,35 @@ class _AddressFormState extends State<_AddressForm> {
             children: [
               Text(
                 widget.address == null ? 'Add Address' : 'Edit Address',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20),
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
               ),
               const SizedBox(height: 16),
               _field('Label', _labelController, Icons.label_outline),
-              _field('Street Address', _streetController, Icons.home_outlined, maxLines: 2),
+              _field(
+                'Street Address',
+                _streetController,
+                Icons.home_outlined,
+                maxLines: 2,
+              ),
               _field('Area / Mohalla', _areaController, Icons.place_outlined),
               _field('City', _cityController, Icons.location_city_outlined),
-              _field('Phone', _phoneController, Icons.phone_outlined, keyboardType: TextInputType.phone),
+              _field(
+                'Phone',
+                _phoneController,
+                Icons.phone_outlined,
+                keyboardType: TextInputType.phone,
+              ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _isDefault,
                 onChanged: (value) => setState(() => _isDefault = value),
-                title: Text('Use as default address', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                title: Text(
+                  'Use as default address',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                ),
               ),
               const SizedBox(height: 12),
               SizedBox(
@@ -293,7 +345,14 @@ class _AddressFormState extends State<_AddressForm> {
                 child: ElevatedButton(
                   onPressed: _isSaving ? null : _save,
                   child: _isSaving
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                       : const Text('Save Address'),
                 ),
               ),
@@ -317,7 +376,8 @@ class _AddressFormState extends State<_AddressForm> {
         controller: controller,
         maxLines: maxLines,
         keyboardType: keyboardType,
-        validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
+        validator: (value) =>
+            value == null || value.trim().isEmpty ? 'Required' : null,
         decoration: InputDecoration(
           labelText: label,
           prefixIcon: Icon(icon),
@@ -341,9 +401,19 @@ class _EmptyAddresses extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.location_off_outlined, size: 64, color: Colors.grey[400]),
+            Icon(
+              Icons.location_off_outlined,
+              size: 64,
+              color: Colors.grey[400],
+            ),
             const SizedBox(height: 16),
-            Text('No saved addresses', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              'No saved addresses',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
               'Add your delivery address once and use it faster at checkout.',

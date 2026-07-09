@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, ShoppingBag, LogOut, User, Layers, Users, Settings, BarChart3, BadgePercent, Bell, MessageSquare, Star, Warehouse, Bike } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, LogOut, User, Layers, Users, Settings, BarChart3, BadgePercent, Bell, MessageSquare, Star, Warehouse, Bike, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function Sidebar({
@@ -21,6 +21,7 @@ export default function Sidebar({
         { href: '/inventory', label: 'Inventory', icon: Warehouse },
         { href: '/categories', label: 'Categories', icon: Layers },
         { href: '/orders', label: 'Orders', icon: ShoppingBag },
+        { href: '/whatsapp', label: 'WhatsApp Inbox', icon: MessageCircle },
         { href: '/riders', label: 'Riders', icon: Bike },
         { href: '/promos', label: 'Promo Codes', icon: BadgePercent },
         { href: '/notifications', label: 'Notifications', icon: Bell },

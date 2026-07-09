@@ -26,17 +26,25 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<ProductProvider>(context, listen: false).fetchCategories();
       Provider.of<ProductProvider>(context, listen: false).fetchProducts();
-      Provider.of<WishlistProvider>(context, listen: false).fetchWishlist();
+      if (Provider.of<AuthProvider>(context, listen: false).isAuthenticated) {
+        Provider.of<WishlistProvider>(context, listen: false).fetchWishlist();
+      }
       Provider.of<HomeProvider>(context, listen: false).fetchHomeLayout();
     });
   }
 
   Future<void> _refresh() async {
-    await Future.wait([
+    final requests = <Future<void>>[
       Provider.of<ProductProvider>(context, listen: false).fetchCategories(),
       Provider.of<ProductProvider>(context, listen: false).fetchProducts(),
       Provider.of<HomeProvider>(context, listen: false).fetchHomeLayout(),
-    ]);
+    ];
+    if (Provider.of<AuthProvider>(context, listen: false).isAuthenticated) {
+      requests.add(
+        Provider.of<WishlistProvider>(context, listen: false).fetchWishlist(),
+      );
+    }
+    await Future.wait(requests);
   }
 
   Future<void> _scrollToExplore() async {
@@ -52,18 +60,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<dynamic> _sectionProducts(ProductProvider provider, dynamic section) {
     if (section.filterType == 'featured') {
-      return provider.products.where((product) => product['isFeatured'] == true).toList();
+      return provider.products
+          .where((product) => product['isFeatured'] == true)
+          .toList();
     }
     if (section.filterType == 'category') {
       return provider.products.where((product) {
         final category = product['category'];
-        return category == section.categoryId || (category is Map && category['_id'] == section.categoryId);
+        return category == section.categoryId ||
+            (category is Map && category['_id'] == section.categoryId);
       }).toList();
     }
     return List<dynamic>.from(provider.products);
   }
 
-  Future<void> _handleBannerTap(dynamic banner, ProductProvider productProvider) async {
+  Future<void> _handleBannerTap(
+    dynamic banner,
+    ProductProvider productProvider,
+  ) async {
     if (banner.linkType == 'category' && banner.linkId.isNotEmpty) {
       final category = productProvider.categories.firstWhere(
         (item) => item['_id'] == banner.linkId,
@@ -80,7 +94,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final product = await productProvider.getProductById(banner.linkId);
       if (!mounted || product == null) return;
       Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => ProductDetailScreen(product: product)),
+        MaterialPageRoute(
+          builder: (_) => ProductDetailScreen(product: product),
+        ),
       );
     }
   }
@@ -104,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 slivers: [
                   SliverAppBar(
                     pinned: true,
-                    expandedHeight: 172,
+                    expandedHeight: 200,
                     collapsedHeight: 84,
                     toolbarHeight: 28,
                     automaticallyImplyLeading: false,
@@ -122,7 +138,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       preferredSize: const Size.fromHeight(64),
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                        child: LiveSearchBar(placeholder: settings.searchPlaceholder),
+                        child: LiveSearchBar(
+                          placeholder: settings.searchPlaceholder,
+                        ),
                       ),
                     ),
                   ),
@@ -141,8 +159,12 @@ class _HomeScreenState extends State<HomeScreen> {
                               title: banner.title,
                               subtitle: banner.subtitle,
                               imageUrl: banner.imageUrl,
-                              margin: EdgeInsets.only(left: index == 0 ? 16 : 8, right: 8),
-                              onTap: () => _handleBannerTap(banner, productProvider),
+                              margin: EdgeInsets.only(
+                                left: index == 0 ? 16 : 8,
+                                right: 8,
+                              ),
+                              onTap: () =>
+                                  _handleBannerTap(banner, productProvider),
                             );
                           },
                         ),
@@ -150,7 +172,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   if (settings.showBanners && homeProvider.banners.isNotEmpty)
                     const SliverToBoxAdapter(child: SizedBox(height: 22)),
-                  if (settings.showCategories && productProvider.categories.isNotEmpty) ...[
+                  if (settings.showCategories &&
+                      productProvider.categories.isNotEmpty) ...[
                     SliverToBoxAdapter(
                       child: _SectionHeader(title: settings.categoryTitle),
                     ),
@@ -161,14 +184,17 @@ class _HomeScreenState extends State<HomeScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           scrollDirection: Axis.horizontal,
                           itemCount: productProvider.categories.length,
-                          separatorBuilder: (context, index) => const SizedBox(width: 12),
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(width: 12),
                           itemBuilder: (context, index) {
                             final category = productProvider.categories[index];
                             return _CategoryTile(
                               category: category,
                               onTap: () {
-                                Provider.of<ProductProvider>(context, listen: false)
-                                    .filterByCategory(category['name']);
+                                Provider.of<ProductProvider>(
+                                  context,
+                                  listen: false,
+                                ).filterByCategory(category['name']);
                                 _scrollToExplore();
                               },
                             );
@@ -180,9 +206,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                   if (settings.showDynamicSections)
                     ...homeProvider.sections.expand((section) {
-                      final sectionProducts = _sectionProducts(productProvider, section);
+                      final sectionProducts = _sectionProducts(
+                        productProvider,
+                        section,
+                      );
                       if (sectionProducts.isEmpty) {
-                        return [const SliverToBoxAdapter(child: SizedBox.shrink())];
+                        return [
+                          const SliverToBoxAdapter(child: SizedBox.shrink()),
+                        ];
                       }
 
                       return [
@@ -192,12 +223,16 @@ class _HomeScreenState extends State<HomeScreen> {
                             actionLabel: 'See all',
                             onAction: () {
                               if (section.filterType == 'category') {
-                                final category = productProvider.categories.firstWhere(
-                                  (item) => item['_id'] == section.categoryId,
-                                  orElse: () => null,
-                                );
+                                final category = productProvider.categories
+                                    .firstWhere(
+                                      (item) =>
+                                          item['_id'] == section.categoryId,
+                                      orElse: () => null,
+                                    );
                                 if (category != null) {
-                                  productProvider.filterByCategory(category['name']);
+                                  productProvider.filterByCategory(
+                                    category['name'],
+                                  );
                                 }
                               } else {
                                 productProvider.filterByCategory('All');
@@ -210,15 +245,20 @@ class _HomeScreenState extends State<HomeScreen> {
                           SliverPadding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             sliver: SliverGrid(
-                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                childAspectRatio: 0.7,
-                                mainAxisSpacing: 12,
-                                crossAxisSpacing: 12,
-                              ),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    childAspectRatio: 0.67,
+                                    mainAxisSpacing: 12,
+                                    crossAxisSpacing: 12,
+                                  ),
                               delegate: SliverChildBuilderDelegate(
-                                (context, index) => ProductCard(product: sectionProducts[index]),
-                                childCount: sectionProducts.length > 6 ? 6 : sectionProducts.length,
+                                (context, index) => ProductCard(
+                                  product: sectionProducts[index],
+                                ),
+                                childCount: sectionProducts.length > 6
+                                    ? 6
+                                    : sectionProducts.length,
                               ),
                             ),
                           )
@@ -227,15 +267,24 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: SizedBox(
                               height: 264,
                               child: ListView.builder(
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
                                 scrollDirection: Axis.horizontal,
-                                itemCount: sectionProducts.length > 10 ? 10 : sectionProducts.length,
+                                itemCount: sectionProducts.length > 10
+                                    ? 10
+                                    : sectionProducts.length,
                                 itemBuilder: (context, index) {
                                   return SizedBox(
                                     width: 158,
                                     child: Padding(
-                                      padding: const EdgeInsets.only(right: 12, bottom: 10),
-                                      child: ProductCard(product: sectionProducts[index]),
+                                      padding: const EdgeInsets.only(
+                                        right: 12,
+                                        bottom: 10,
+                                      ),
+                                      child: ProductCard(
+                                        product: sectionProducts[index],
+                                      ),
                                     ),
                                   );
                                 },
@@ -250,18 +299,51 @@ class _HomeScreenState extends State<HomeScreen> {
                       key: _exploreSectionKey,
                       child: _SectionHeader(
                         title: settings.exploreTitle,
-                        actionLabel: productProvider.hasActiveFilter ? 'Clear' : null,
+                        actionLabel: productProvider.hasActiveFilter
+                            ? 'Clear'
+                            : null,
                         onAction: () => productProvider.filterByCategory('All'),
                       ),
                     ),
-                    if (productProvider.filteredProducts.isEmpty)
+                    if (productProvider.errorMessage != null)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(32, 28, 32, 16),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.cloud_off_outlined,
+                                size: 48,
+                                color: Colors.grey.shade500,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                productProvider.errorMessage!,
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.poppins(
+                                  color: const Color(0xFF7B8190),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              FilledButton.icon(
+                                onPressed: _refresh,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Try Again'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else if (productProvider.filteredProducts.isEmpty)
                       SliverToBoxAdapter(
                         child: Padding(
                           padding: const EdgeInsets.all(40),
                           child: Text(
                             'No products found',
                             textAlign: TextAlign.center,
-                            style: GoogleFonts.poppins(color: const Color(0xFF7B8190)),
+                            style: GoogleFonts.poppins(
+                              color: const Color(0xFF7B8190),
+                            ),
                           ),
                         ),
                       )
@@ -269,14 +351,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       SliverPadding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         sliver: SliverGrid(
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 0.7,
-                            mainAxisSpacing: 12,
-                            crossAxisSpacing: 12,
-                          ),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 0.67,
+                                mainAxisSpacing: 12,
+                                crossAxisSpacing: 12,
+                              ),
                           delegate: SliverChildBuilderDelegate(
-                            (context, index) => ProductCard(product: productProvider.filteredProducts[index]),
+                            (context, index) => ProductCard(
+                              product: productProvider.filteredProducts[index],
+                            ),
                             childCount: productProvider.filteredProducts.length,
                           ),
                         ),
@@ -294,16 +379,18 @@ class _HomeHeader extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  const _HomeHeader({
-    required this.title,
-    required this.subtitle,
-  });
+  const _HomeHeader({required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 12, 16, 80),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        MediaQuery.of(context).padding.top + 12,
+        16,
+        80,
+      ),
       decoration: BoxDecoration(
         color: theme.colorScheme.primary,
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
@@ -320,11 +407,11 @@ class _HomeHeader extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                      overflow: TextOverflow.fade,
                       style: GoogleFonts.poppins(
                         color: Colors.white,
-                        fontSize: 22,
+                        fontSize: 20,
                         fontWeight: FontWeight.w800,
                         height: 1.15,
                       ),
@@ -355,11 +442,16 @@ class _HomeHeader extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white,
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.7), width: 2),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        width: 2,
+                      ),
                     ),
                     child: CircleAvatar(
                       backgroundColor: Colors.white,
-                      backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+                      backgroundImage: photoUrl.isNotEmpty
+                          ? NetworkImage(photoUrl)
+                          : null,
                       child: photoUrl.isEmpty
                           ? Text(
                               name.isNotEmpty ? name[0].toUpperCase() : 'G',
@@ -421,7 +513,8 @@ class _BannerCard extends StatelessWidget {
               Image.network(
                 imageUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => const ColoredBox(color: Color(0xFFE8EEE7)),
+                errorBuilder: (context, error, stackTrace) =>
+                    const ColoredBox(color: Color(0xFFE8EEE7)),
               ),
             DecoratedBox(
               decoration: BoxDecoration(
@@ -480,10 +573,7 @@ class _CategoryTile extends StatelessWidget {
   final dynamic category;
   final VoidCallback onTap;
 
-  const _CategoryTile({
-    required this.category,
-    required this.onTap,
-  });
+  const _CategoryTile({required this.category, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -519,7 +609,10 @@ class _CategoryTile extends StatelessWidget {
                         color: Theme.of(context).colorScheme.primary,
                       ),
                     )
-                  : Icon(Icons.category_rounded, color: Theme.of(context).colorScheme.primary),
+                  : Icon(
+                      Icons.category_rounded,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -546,11 +639,7 @@ class _SectionHeader extends StatelessWidget {
   final String? actionLabel;
   final VoidCallback? onAction;
 
-  const _SectionHeader({
-    required this.title,
-    this.actionLabel,
-    this.onAction,
-  });
+  const _SectionHeader({required this.title, this.actionLabel, this.onAction});
 
   @override
   Widget build(BuildContext context) {
@@ -579,7 +668,10 @@ class _SectionHeader extends StatelessWidget {
               ),
               child: Text(
                 actionLabel!,
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 12),
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
               ),
             ),
         ],
